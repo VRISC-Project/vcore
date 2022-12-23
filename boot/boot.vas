@@ -1,0 +1,56 @@
+.fmt raw
+
+.start 0x0
+.align 8
+
+.data
+
+interrupt_vectors:
+    j start
+    .q  ir_not_effective_address
+    .q  ir_devices
+    .q  0
+
+mem_ended:
+    .b 1
+
+.text
+
+start:
+    //设置中断
+    ldi ir_div_by_zero,x0
+    ldi interrupt_vectors,x1
+    stm x0,x1
+    livt x1
+    ei
+    //探测内存，x1为内存大小
+    ldi 0,x0
+    mv x0,x1
+    @:
+        stm x0,x1
+        inc x1
+        ldi mem_ended,x3
+        ldm x3,x3
+        loop x3,@F
+    nop
+
+//中断处理程序
+
+ir_div_by_zero:
+    ir
+
+ir_not_effective_address:
+    mv x0,x15
+    mv x1,x14
+
+    ldi 0,x0
+    ldi mem_ended,x1
+    stm x0,x1
+
+    mv x15,x0
+    mv x14,x1
+
+    ir 0
+
+ir_devices:
+    ir
