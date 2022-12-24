@@ -14,6 +14,13 @@
 
 #include "../types.h"
 
+char *exts_name = {
+  "",
+  "bae",
+  "ave",
+  "simde"
+};
+
 typedef struct core
 {
   struct regs
@@ -52,6 +59,10 @@ typedef struct core
     u8 triggered;
 
     u8 int_id;
+#define IR_DIV_BY_ZERO 0
+#define IR_NOT_EFFECTIVE_ADDRESS 1
+#define IR_DEVICES 2
+#define IR_INSTRUCTION_NOT_RECOGNIZED 3
   } interrupt;
 
 } _core;

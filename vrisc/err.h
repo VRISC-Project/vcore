@@ -14,3 +14,4 @@
 #define BOOTLOADER_BAD -3
 #define MEM_TOO_SMALL -4
 #define CONSOLE_FAILED -5
+#define EXT_VERIFY_FAILED -6

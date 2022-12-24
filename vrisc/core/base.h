@@ -48,5 +48,7 @@ u64 lkpt(u8 *inst, _core *core);
 u64 lupt(u8 *inst, _core *core);
 u64 lsrg(u8 *inst, _core *core);
 u64 ssrg(u8 *inst, _core *core);
+u64 in(u8 *inst, _core *core);
+u64 out(u8 *inst, _core *core);
 
 #endif

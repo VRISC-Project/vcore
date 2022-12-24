@@ -26,7 +26,8 @@ struct options
 {
   u64 mem_size;
   u8 core;
-  char *bootloader;
+  char *bootloader; // 启动代码文件
+  char *extinsts;   // 扩展指令集路径
 } cmd_options;
 
 pthread_t *cores;
@@ -138,7 +139,7 @@ void create_cores()
 void deal_with_cmdline(int argc, char **argv)
 {
   int opt;
-  while ((opt = getopt(argc, argv, "m:c:b:")) != -1)
+  while ((opt = getopt(argc, argv, "m:c:b:e")) != -1)
   {
     switch (opt)
     {
@@ -152,6 +153,10 @@ void deal_with_cmdline(int argc, char **argv)
 
     case 'b': // 引导程序
       cmd_options.bootloader = optarg;
+      break;
+
+    case 'e': // 扩展指令集路径
+      cmd_options.extinsts = optarg;
       break;
 
     default:
