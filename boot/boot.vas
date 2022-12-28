@@ -31,13 +31,14 @@ start:
         inc x1
         ldi mem_ended,x3
         ldm x3,x3
+        cut x3,1
         loop x3,@F
     nop
 
 //中断处理程序
 
 ir_div_by_zero:
-    ir
+    ir 1
 
 ir_not_effective_address:
     mv x0,x15
@@ -50,7 +51,7 @@ ir_not_effective_address:
     mv x15,x0
     mv x14,x1
 
-    ir 0
+    ir 1
 
 ir_devices:
-    ir
+    ir 1
