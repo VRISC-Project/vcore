@@ -15,17 +15,19 @@
 #include "../types.h"
 #include "vrisc.h"
 
+extern u8 *memory;
+
 u64 add(u8 *inst, _core *core);
 u64 sub(u8 *inst, _core *core);
 u64 inc(u8 *inst, _core *core);
 u64 dec(u8 *inst, _core *core);
 u64 cmp(u8 *inst, _core *core);
-u64 and (u8 * inst, _core *core);
-u64 or (u8 * inst, _core *core);
+u64 _and (u8 * inst, _core *core);
+u64 _or (u8 * inst, _core *core);
 u64 not(u8 * inst, _core *core);
-u64 xor (u8 * inst, _core *core);
+u64 _xor (u8 * inst, _core *core);
 u64 jc(u8 *inst, _core *core);
-u64 c(u8 *inst, _core *core);
+u64 cc(u8 *inst, _core *core);
 u64 r(u8 *inst, _core *core);
 u64 ir(u8 *inst, _core *core);
 u64 sysc(u8 *inst, _core *core);
@@ -50,5 +52,6 @@ u64 lsrg(u8 *inst, _core *core);
 u64 ssrg(u8 *inst, _core *core);
 u64 in(u8 *inst, _core *core);
 u64 out(u8 *inst, _core *core);
+u64 cut(u8 *inst, _core *core);
 
 #endif

@@ -14,12 +14,19 @@
 
 #include "../types.h"
 
-char *exts_name = {
-  "",
-  "bae",
-  "ave",
-  "simde"
+struct options
+{
+  u64 mem_size;
+  u8 core;
+  char *bootloader; // 启动代码文件
+  char *extinsts;   // 扩展指令集路径
 };
+
+char *exts_name = {
+    "",
+    "bae",
+    "ave",
+    "simde"};
 
 typedef struct core
 {
@@ -44,7 +51,8 @@ typedef struct core
     ^8-privilege level(effective when paging enabled)
       0-kernel
       1-user
-    ^9-
+    ^9-higher
+    ^10-lower
      */
     u64 flg;
     u64 ip;
@@ -52,6 +60,7 @@ typedef struct core
     u64 ksb, kst; // 内核态栈帧
     u64 kpt, upt; // 内核态和用户态页表指针
     u64 ivt;      // 中断向量表
+    u64 scp;      // 系统调用指针
   } regs;
 
   struct interrupt
@@ -63,6 +72,7 @@ typedef struct core
 #define IR_NOT_EFFECTIVE_ADDRESS 1
 #define IR_DEVICES 2
 #define IR_INSTRUCTION_NOT_RECOGNIZED 3
+#define IR_CLOCK 4
   } interrupt;
 
 } _core;
@@ -70,6 +80,8 @@ typedef struct core
 extern u8 *core_start_flags;
 
 extern u64 (*instructions)(u8 *inst);
+
+u64 vtaddr(u64 ip);
 
 void init_core();
 

@@ -20,16 +20,9 @@
 #include <unistd.h>
 #include <string.h>
 #include <dlfcn.h>
+#include <pthread.h>
 
 #include "base.h"
-
-struct options
-{
-  u64 mem_size;
-  u8 core;
-  char *bootloader; // 启动代码文件
-  char *extinsts;   // 扩展指令集路径
-};
 
 extern struct options cmd_options;
 
@@ -50,12 +43,12 @@ void init_core()
   instructions[3] = inc;
   instructions[4] = dec;
   instructions[5] = cmp;
-  instructions[6] = and;
-  instructions[7] = or ;
+  instructions[6] = _and;
+  instructions[7] = _or;
   instructions[8] = not ;
-  instructions[9] = xor;
+  instructions[9] = _xor;
   instructions[10] = jc;
-  instructions[11] = c;
+  instructions[11] = cc;
   instructions[12] = r;
   instructions[13] = ir;
   instructions[14] = sysc;
@@ -80,6 +73,7 @@ void init_core()
   instructions[33] = ssrg;
   instructions[36] = in;
   instructions[37] = out;
+  instructions[38] = cut;
 }
 
 static char *generate_extpath(u64 id)
@@ -104,6 +98,25 @@ static char *generate_extpath(u64 id)
   return path;
 }
 
+u64 vtaddr(u64 ip)
+{
+  return ip;
+}
+
+void *clock(void *args)
+{
+  u64 cid = *(u64 *)(((void **)args)[1]);
+  _core *core = (_core *)(((void **)args)[0]);
+  while (core_start_flags[cid])
+  {
+    usleep(2000); // 500 tick/s
+    while (core->interrupt.triggered)
+      ;
+    core->interrupt.triggered = 1;
+    core->interrupt.int_id = IR_CLOCK;
+  }
+}
+
 void *vrisc_core(void *id)
 {
   u64 cid = (u64)id;
@@ -122,23 +135,27 @@ void *vrisc_core(void *id)
     usleep(500);
   }
 
+  u64 clock_id;
+  void *args[2] = {core, &cid};
+  pthread_create(&clock_id, NULL, clock, &args);
+
   while (core_start_flags[cid])
   {
-    if (!*(memory + core->regs.ip))
+    if (!*(memory + vtaddr(core->regs.ip)))
     { // nop
       while (!core->interrupt.triggered)
-        usleep(500);
+        usleep(1000);
       core->regs.ip++;
       continue;
     }
-    if (*(memory + core->regs.ip) == 34)
+    if (*(memory + vtaddr(core->regs.ip)) == 34)
     { // initext
       if (ext_so)
       {
         dlclose(ext_so);
       }
       // 打开扩展指令集
-      u64 extid = memory[core->regs.ip + 1];
+      u64 extid = memory[vtaddr(core->regs.ip) + 1];
       ext_so = dlopen(generate_extpath(extid), RTLD_LAZY);
       // 两次认证
       if ((u64)dlsym(ext_so, "vriscext_id") != extid)
@@ -159,7 +176,7 @@ void *vrisc_core(void *id)
       core->regs.ip += 2;
       continue;
     }
-    else if (*(memory + core->regs.ip) == 35)
+    else if (*(memory + vtaddr(core->regs.ip)) == 35)
     { // destext
       u64 inst_count = *((u64 *)dlsym(ext_so, "vriscext_inst_count"));
       u64 space_start = *((u64 *)dlsym(ext_so, "vriscext_space_start"));
@@ -168,21 +185,24 @@ void *vrisc_core(void *id)
       core->regs.ip += 1;
       continue;
     }
-    if (!(instructions[memory[core->regs.ip]]))
+    if (!(instructions[memory[vtaddr(core->regs.ip)]]))
     { // 无效指令
       core->interrupt.triggered = 1;
       core->interrupt.int_id = IR_INSTRUCTION_NOT_RECOGNIZED;
     }
     if (core->interrupt.triggered)
     { // 如果发生中断先进入中断
+      core->interrupt.triggered = 0;
       core->regs.x[0] = core->regs.ip;
       core->regs.x[1] = core->regs.flg;
       core->regs.flg &= ~(1 << 6); // 关闭flg^6.ie
       core->regs.flg &= ~(1 << 8); // 进入内核态
-      core->regs.ip = memory[core->regs.ivt + core->interrupt.int_id * 8];
+      core->regs.ip = *(u64 *)(memory + core->regs.ivt + core->interrupt.int_id * 8);
       continue;
     }
     // 正常执行指令
-    core->regs.ip += (*instructions[core->regs.ip])(core->regs.ip, core);
+    core->regs.ip += (*instructions[vtaddr(core->regs.ip)])(vtaddr(core->regs.ip), core);
   }
+  free(core);
+  pthread_join(clock_id, NULL);
 }
