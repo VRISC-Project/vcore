@@ -9,10 +9,14 @@ interrupt_vectors:
     j start
     .q  ir_not_effective_address
     .q  ir_devices
+    .q  ir_clock
     .q  0
 
 mem_ended:
-    .b 1
+    .q 1
+
+time:
+    .q 0
 
 .text
 
@@ -54,4 +58,19 @@ ir_not_effective_address:
     ir 1
 
 ir_devices:
+    ir 1
+
+ir_clock:
+    mv x0,x15
+    mv x1,x14
+
+    ldi time,x0
+    ldm x0,x1
+    inc x1
+    inc x1
+    stm x1,x0
+
+    mv x15,x0
+    mv x14,x1
+
     ir 1
