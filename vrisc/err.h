@@ -15,3 +15,6 @@
 #define MEM_TOO_SMALL -4
 #define CONSOLE_FAILED -5
 #define EXT_VERIFY_FAILED -6
+#define CORE_NUM_IS_ZERO -7
+#define NO_BOOTLOADER -8
+#define NO_EXTINSTS -9

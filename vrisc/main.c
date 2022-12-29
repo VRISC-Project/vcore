@@ -14,23 +14,19 @@
 #include <unistd.h>
 #include <getopt.h>
 #include <string.h>
-
 #include <pthread.h>
+
+#define __vrisc_main__
 
 #include "memc.h"
 #include "core/vrisc.h"
+#include "debug/debug.h"
 
 #include "err.h"
 
-struct options
-{
-  u64 mem_size;
-  u8 core;
-  char *bootloader; // 启动代码文件
-  char *extinsts;   // 扩展指令集路径
-} cmd_options;
+struct options cmd_options;
 
-pthread_t *cores;
+pthread_t *core_threads;
 
 void deal_with_cmdline(int argc, char **argv);
 
@@ -41,6 +37,8 @@ void create_cores();
 void *console(void *thr);
 
 void join_cores();
+
+void make_vrisc_device();
 
 int main(int argc, char **argv)
 {
@@ -57,11 +55,15 @@ int main(int argc, char **argv)
   join_cores();
 }
 
+void make_vrisc_device()
+{ // TODO
+}
+
 void join_cores()
 {
   for (u64 u = 0; u < cmd_options.core; u++)
   {
-    pthread_join(cores[u], NULL);
+    pthread_join(core_threads[u], NULL);
   }
 }
 
@@ -70,11 +72,11 @@ void *console(void *thr)
   // 通过一个传参使自己创建一个自己的线程，比较优雅
   if (!thr)
   {
-    u64 id;
+    pthread_t id;
     if (pthread_create(&id, NULL, console, (void *)1))
     {
-      printf("Failed to create console thread.");
-      return CONSOLE_FAILED;
+      printf("Failed to create console thread.\n");
+      return (void *)CONSOLE_FAILED;
     }
     return (void *)id;
   }
@@ -89,21 +91,27 @@ void *console(void *thr)
     while ((ch = getchar()) != '\n' && cmd[cnt - 1] != '\\')
     {
       if (cnt == 128)
+      {
         break;
+      }
       cmd[cnt++] = ch;
     }
-    // TODO
-    printf(cmd);
+    printf(debug(cmd));
   }
 }
 
 void load_bootloader()
 {
+  if (!cmd_options.bootloader)
+  {
+    printf("fatal: No bootloader.\n");
+    exit(NO_BOOTLOADER);
+  }
   // 打开文件
   FILE *bl = fopen(cmd_options.bootloader, "r");
   if (!bl)
   {
-    printf("The bootloader is unreachable.");
+    printf("The bootloader is unreachable.\n");
     exit(BOOTLOADER_BAD);
   }
   // 获取文件大小
@@ -111,7 +119,7 @@ void load_bootloader()
   u64 size = ftell(bl);
   if (size > cmd_options.mem_size)
   {
-    printf("Memory is too small.");
+    printf("Memory is too small.\n");
     exit(MEM_TOO_SMALL);
   }
   // 读取至内存
@@ -125,10 +133,12 @@ void create_cores()
   core_start_flags = malloc(cmd_options.core * sizeof(u8));
   core_start_flags[0] = 1; // 首先开启核心0
 
-  cores = malloc(cmd_options.core * sizeof(pthread_t *));
+  cores = malloc(cmd_options.core * sizeof(_core *));
+
+  core_threads = malloc(cmd_options.core * sizeof(pthread_t *));
   for (u64 u = 0; u < cmd_options.core; u++)
   {
-    if (pthread_create(cores + u, NULL, vrisc_core, (void *)u))
+    if (pthread_create((pthread_t *)(cores + u), NULL, vrisc_core, (void *)u))
     {
       printf("Failed to create core#%d.\n", u);
       exit(CORE_FAILED);
@@ -138,6 +148,10 @@ void create_cores()
 
 void deal_with_cmdline(int argc, char **argv)
 {
+  cmd_options.bootloader = NULL;
+  cmd_options.core = 0;
+  cmd_options.extinsts = NULL;
+  cmd_options.mem_size = 0;
   int opt;
   while ((opt = getopt(argc, argv, "m:c:b:e")) != -1)
   {
@@ -149,6 +163,11 @@ void deal_with_cmdline(int argc, char **argv)
 
     case 'c': // 核心数
       cmd_options.core = atoi(optarg);
+      if (cmd_options.core == 0)
+      {
+        printf("fatal: The number of core is zero.\n");
+        exit(CORE_NUM_IS_ZERO);
+      }
       break;
 
     case 'b': // 引导程序

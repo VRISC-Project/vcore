@@ -493,7 +493,7 @@ u64 ldm(u8 *inst, _core *core)
     return 0;
   }
   // TODO 用户态权限检查
-  core->regs.x[tar] = *(u64 *)(memory + vtaddr(addr));
+  core->regs.x[tar] = *(u64 *)(memory + vtaddr(addr, core));
   return 2;
 }
 
@@ -510,7 +510,7 @@ u64 stm(u8 *inst, _core *core)
     return 0;
   }
   // TODO 用户态权限检查
-  *(u64 *)(memory + vtaddr(addr)) = core->regs.x[src];
+  *(u64 *)(memory + vtaddr(addr, core)) = core->regs.x[src];
   return 2;
 }
 
@@ -547,7 +547,7 @@ u64 mv(u8 *inst, _core *core)
   u64 s, t;
   if (flg & 2)
   {
-    s = *(u64 *)(memory + vtaddr(core->regs.x[src]));
+    s = *(u64 *)(memory + vtaddr(core->regs.x[src], core));
   }
   else
   {
@@ -556,7 +556,7 @@ u64 mv(u8 *inst, _core *core)
 
   if (flg & 1)
   {
-    *(u64 *)(memory + vtaddr(core->regs.x[tar])) = s;
+    *(u64 *)(memory + vtaddr(core->regs.x[tar], core)) = s;
   }
   else
   {

@@ -22,11 +22,7 @@ struct options
   char *extinsts;   // 扩展指令集路径
 };
 
-char *exts_name = {
-    "",
-    "bae",
-    "ave",
-    "simde"};
+extern char *exts_name[];
 
 typedef struct core
 {
@@ -77,11 +73,16 @@ typedef struct core
 
 } _core;
 
+#ifdef __vrisc_main__
+
 extern u8 *core_start_flags;
+extern _core **cores;
 
-extern u64 (*instructions)(u8 *inst);
+extern u64 (*instructions)(u8 *, _core *);
 
-u64 vtaddr(u64 ip);
+#endif
+
+u64 vtaddr(u64 ip, _core *core);
 
 void init_core();
 
