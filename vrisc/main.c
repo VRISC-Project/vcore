@@ -48,6 +48,8 @@ int main(int argc, char **argv)
 
   load_bootloader();
 
+  init_core();
+
   create_cores();
 
   pthread_join((pthread_t)console(0), NULL);

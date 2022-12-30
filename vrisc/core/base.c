@@ -315,6 +315,7 @@ u64 jc(u8 *inst, _core *core)
   if (condition(cond, core->regs.flg))
   {
     core->regs.ip = tar;
+    return 0;
   }
   return opl + 2;
 }

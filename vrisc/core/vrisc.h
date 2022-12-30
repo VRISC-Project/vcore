@@ -67,8 +67,8 @@ typedef struct core
 #define IR_DIV_BY_ZERO 0
 #define IR_NOT_EFFECTIVE_ADDRESS 1
 #define IR_DEVICES 2
-#define IR_INSTRUCTION_NOT_RECOGNIZED 3
-#define IR_CLOCK 4
+#define IR_CLOCK 3
+#define IR_INSTRUCTION_NOT_RECOGNIZED 4
   } interrupt;
 
 } _core;

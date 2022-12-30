@@ -216,7 +216,9 @@ void *vrisc_core(void *id)
       continue;
     }
     // 正常执行指令
-    core->regs.ip += (*instructions[vtaddr(core->regs.ip, core)])(memory + vtaddr(core->regs.ip, core), core);
+    core->regs.ip +=
+        (*instructions[*(memory + vtaddr(core->regs.ip, core))])(
+            memory + vtaddr(core->regs.ip, core), core);
   }
   free(core);
   pthread_join(clock_id, NULL);
