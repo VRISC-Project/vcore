@@ -17,7 +17,8 @@
 
 u8 *memory;
 
-void create_memory(u64 size)
+void
+create_memory(u64 size)
 {
   memory = malloc(size);
   if (!memory)

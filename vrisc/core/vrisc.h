@@ -25,6 +25,13 @@ struct options
 
 extern char *exts_name[];
 
+// 中断队列节点
+typedef struct interrupt_queue_node
+{
+  u8 id;
+  struct interrupt_queue_node *prev, *next;
+} interrupt_queue_node;
+
 typedef struct core
 {
   struct regs
@@ -63,7 +70,6 @@ typedef struct core
   struct interrupt
   {
     u8 triggered;
-
     u8 int_id;
 #define IR_DIV_BY_ZERO 0                // 除数为0
 #define IR_NOT_EFFECTIVE_ADDRESS 1      // 无效地址
@@ -71,6 +77,12 @@ typedef struct core
 #define IR_CLOCK 3                      // 时钟
 #define IR_INSTRUCTION_NOT_RECOGNIZED 4 // 指令无法识别
 #define IR_PERMISSION_DENIED 5          // 权限错误
+
+    struct controller
+    {
+      interrupt_queue_node *interrupt_queue; // 中断队列
+      interrupt_queue_node *iqtail;          // 中断队列的结尾
+    } controller;
   } interrupt;
 
   /*
@@ -92,10 +104,15 @@ extern u64 (*instructions)(u8 *, _core *);
 
 #endif
 
+// 初始化vrisc核心
 void init_core();
 
+// 寻址
 u64 vtaddr(u64 ip, _core *core, u8 test_or_address);
 
+// vrisc核心线程
 void *vrisc_core(void *id);
+
+void intctl_addint(_core *core, u8 intid);
 
 #endif

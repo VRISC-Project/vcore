@@ -16,7 +16,8 @@ char *commands[] = {
     (char *)"bp", // 设置断点
 };
 
-char *debug(const char *command)
+char *
+debug(const char *command)
 {
     return (char *)command;
 }

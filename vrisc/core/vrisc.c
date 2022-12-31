@@ -96,6 +96,25 @@ void init_core()
   instructions[38] = cut;
 }
 
+/* 添加一个中断 */
+void intctl_addint(_core *core, u8 intid)
+{
+  interrupt_queue_node *adder = malloc(sizeof(interrupt_queue_node));
+  adder->id = intid;
+  adder->next = core->interrupt.controller.interrupt_queue;
+  adder->prev = NULL;
+  if (core->interrupt.controller.interrupt_queue)
+  {
+    core->interrupt.controller.interrupt_queue->prev = adder;
+  }
+  else
+  {
+    core->interrupt.controller.interrupt_queue = adder;
+    core->interrupt.controller.iqtail = adder;
+  }
+  core->interrupt.controller.interrupt_queue = adder;
+}
+
 #define LEVEL4_PTS_AREA (0x003ff00000000000)
 #define LEVEL3_PTS_AREA (0x00000ffc00000000)
 #define LEVEL2_PTS_AREA (0x00000003ff000000)
@@ -108,6 +127,7 @@ void init_core()
 #define LEVEL3_PTS_OFFSET (34)
 #define LEVEL2_PTS_OFFSET (24)
 #define LEVEL1_PTS_OFFSET (14)
+#define USERFLAG (0x8000000000000000)
 /* 寻址函数
 参数test_or_address为0时表示寻址，不为零表示测试地址有效性。
 测试地址有效性时，返回0为无效，非零为有效。
@@ -119,18 +139,23 @@ u64 vtaddr(u64 ip, _core *core, u8 test_or_address)
   { // 未开启分页
     if (test_or_address && (core->regs.flg & (1 << 8)))
     { // 处于用户态，不可以使用物理地址
-      // TODO 等待实现中断管理器，产生IR_PERMISSION_DENIED中断
+      intctl_addint(core, IR_PERMISSION_DENIED);
+      return 0;
+    }
+    if (ip >= cmd_options.mem_size)
+    {
+      intctl_addint(core, IR_NOT_EFFECTIVE_ADDRESS);
       return 0;
     }
     return ip;
   }
 
-  u8 addr_in_usermod = (ip & (1 << 63)) ? 1 : 0;
-  ip &= ~(1 << 63);
+  u8 addr_in_usermod = (ip & USERFLAG) ? 1 : 0;
+  ip &= ~USERFLAG;
 
   if (test_or_address && (core->regs.flg & (1 << 8)) && !addr_in_usermod)
   { // 用户态使用内核态地址
-    // TODO 等待实现中断管理器，产生IR_PERMISSION_DENIED中断
+    intctl_addint(core, IR_PERMISSION_DENIED);
     return 0;
   }
 
@@ -150,7 +175,7 @@ u64 vtaddr(u64 ip, _core *core, u8 test_or_address)
   if (level4_bigpage)
   { // 如果是大页
     if (test_or_address && !level4_exist)
-    { // 此页不在内存中，产生IR_NOT_EFFECTIVE_ADDRESS中断
+    {
       goto generate_interrupt;
       return 0;
     }
@@ -167,7 +192,7 @@ u64 vtaddr(u64 ip, _core *core, u8 test_or_address)
   if (level3_bigpage)
   { // 如果是大页
     if (test_or_address && !level3_exist)
-    { // 此页不在内存中，产生IR_NOT_EFFECTIVE_ADDRESS中断
+    {
       goto generate_interrupt;
       return 0;
     }
@@ -184,7 +209,7 @@ u64 vtaddr(u64 ip, _core *core, u8 test_or_address)
   if (level2_bigpage)
   { // 如果是大页
     if (test_or_address && !level2_exist)
-    { // 此页不在内存中，产生IR_NOT_EFFECTIVE_ADDRESS中断
+    {
       goto generate_interrupt;
       return 0;
     }
@@ -197,28 +222,34 @@ u64 vtaddr(u64 ip, _core *core, u8 test_or_address)
   page_addr &= ~PAGE_OFFSET;
 
   if (test_or_address && !level1_exist)
-  { // 此页不在内存中，产生IR_NOT_EFFECTIVE_ADDRESS中断
+  {
     goto generate_interrupt;
     return 0;
   }
-  return page_addr | (ip & PAGE_OFFSET);
+  ip = page_addr | (ip & PAGE_OFFSET);
+  if (ip >= cmd_options.mem_size)
+  {
+    intctl_addint(core, IR_NOT_EFFECTIVE_ADDRESS);
+    return 0;
+  }
+  return ip;
 generate_interrupt:
-  // TODO 等待实现中断管理器，产生IR_NOT_EFFECTIVE_ADDRESS中断
+  intctl_addint(core, IR_NOT_EFFECTIVE_ADDRESS);
   return 0;
 }
 
-static u64 get_us_time()
-{
 #if defined(__linux__)
+static u64
+get_us_time()
+{
   static struct timeval time;
   gettimeofday(&time, NULL);
   return time.tv_sec * 1000 * 1000 + time.tv_usec;
-#elif defined(_WIN32)
-
-#endif
 }
+#endif
 
-void *clock_producer(void *args)
+void *
+clock_producer(void *args)
 {
   u64 cid = *(u64 *)(((void **)args)[1]);
   _core *core = (_core *)(((void **)args)[0]);
@@ -234,13 +265,14 @@ void *clock_producer(void *args)
       slp_time = usleep(slp_time);
     }
 #elif defined(_WIN32)
-
+    Sleep(1);
 #endif
-    // TODO 使用中断管理器发送中断
+    intctl_addint(core, IR_CLOCK);
   }
 }
 
-static void inst_nop(_core *core, u64 *ipbuff)
+static void
+inst_nop(_core *core, u64 *ipbuff)
 {
   while (!core->interrupt.triggered)
   {
@@ -254,7 +286,8 @@ static void inst_nop(_core *core, u64 *ipbuff)
   (*ipbuff)++;
 }
 
-static char *generate_extpath(u64 id)
+static char *
+generate_extpath(u64 id)
 {
   if (!cmd_options.extinsts)
   {
@@ -285,7 +318,8 @@ static char *generate_extpath(u64 id)
   return path;
 }
 
-static void inst_initext(_core *core, u64 *ipbuff)
+static void
+inst_initext(_core *core, u64 *ipbuff)
 {
 #if defined(__linux__)
   if (ext_so)
@@ -318,7 +352,8 @@ static void inst_initext(_core *core, u64 *ipbuff)
   *ipbuff += 2;
 }
 
-static void inst_destext(_core *core, u64 *ipbuff)
+static void
+inst_destext(_core *core, u64 *ipbuff)
 {
 #if defined(__linux__)
   u64 inst_count = *((u64 *)dlsym(ext_so, "vriscext_inst_count"));
@@ -332,7 +367,51 @@ static void inst_destext(_core *core, u64 *ipbuff)
   (*ipbuff)++;
 }
 
-void *vrisc_core(void *id)
+/* 中断控制器线程 */
+void *
+interrup_controller(void *args)
+{
+  u64 cid = *(u64 *)(((void **)args)[1]);
+  _core *core = (_core *)(((void **)args)[0]);
+  while (core_start_flags[cid])
+  {
+#if defined(__linux__)
+    usleep(100);
+#elif defined(_WIN32)
+    Sleep(1);
+#endif
+    // 队列为空
+    if (!core->interrupt.controller.interrupt_queue &&
+        !core->interrupt.controller.iqtail)
+    {
+      continue;
+    }
+    // 上一个中断未被处理
+    if (core->interrupt.triggered)
+    {
+      continue;
+    }
+
+    core->interrupt.triggered = 1;
+    core->interrupt.int_id = core->interrupt.controller.iqtail->id;
+
+    if (core->interrupt.controller.interrupt_queue ==
+        core->interrupt.controller.iqtail)
+    {
+      free(core->interrupt.controller.interrupt_queue);
+      core->interrupt.controller.interrupt_queue = NULL;
+      core->interrupt.controller.iqtail = NULL;
+      continue;
+    }
+    interrupt_queue_node *node = core->interrupt.controller.iqtail;
+    core->interrupt.controller.iqtail = node->prev;
+    core->interrupt.controller.iqtail->next = NULL;
+    free(node);
+  }
+}
+
+void *
+vrisc_core(void *id)
 {
   u64 cid = (u64)id;
   _core *core = malloc(sizeof(_core)); // 构造核心
@@ -357,11 +436,15 @@ void *vrisc_core(void *id)
   }
 
   pthread_t clock_id;
+  void *args[2] = {core, &cid};
   if (cmd_options.shield_internal_clock)
   { // 开启内部时钟
-    void *args[2] = {core, &cid};
     pthread_create(&clock_id, NULL, clock_producer, &args);
   }
+
+  // 开启中断控制器
+  pthread_t interrup_controller_id;
+  pthread_create(&interrup_controller_id, NULL, interrup_controller, &args);
 
   u64 ipbuff; // 此变量说明见 _core::ipbuff_need_flush
 

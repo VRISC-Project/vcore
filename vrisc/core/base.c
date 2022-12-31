@@ -493,11 +493,6 @@ u64 ldm(u8 *inst, _core *core)
   u8 src = tar % 16;
   tar >>= 4;
   u8 addr = core->regs.x[src];
-  if (addr > cmd_options.mem_size)
-  {
-    // TODO 使用中断管理器产生中断IR_NOT_EFFECTIVE_ADDRESS
-    return 0;
-  }
   if (!vtaddr(addr, core, 1))
   {
     return 0;
@@ -512,11 +507,6 @@ u64 stm(u8 *inst, _core *core)
   u8 src = tar % 16;
   tar >>= 4;
   u8 addr = core->regs.x[tar];
-  if (addr > cmd_options.mem_size)
-  {
-    // TODO 使用中断管理器产生中断IR_NOT_EFFECTIVE_ADDRESS
-    return 0;
-  }
   if (!vtaddr(addr, core, 1))
   {
     return 0;

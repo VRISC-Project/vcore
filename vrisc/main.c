@@ -39,7 +39,8 @@ void join_cores();
 
 void make_vrisc_device();
 
-int main(int argc, char **argv)
+int
+main(int argc, char **argv)
 {
   deal_with_cmdline(argc, argv);
 
@@ -56,11 +57,13 @@ int main(int argc, char **argv)
   join_cores();
 }
 
-void make_vrisc_device()
+void
+make_vrisc_device()
 { // TODO
 }
 
-void join_cores()
+void
+join_cores()
 {
   for (u64 u = 0; u < cmd_options.core; u++)
   {
@@ -68,7 +71,8 @@ void join_cores()
   }
 }
 
-void *console(void *thr)
+void *
+console(void *thr)
 {
   // 通过一个传参使自己创建一个自己的线程，比较优雅
   if (!thr)
@@ -101,7 +105,8 @@ void *console(void *thr)
   }
 }
 
-void load_bootloader()
+void
+load_bootloader()
 {
   if (!cmd_options.bootloader)
   {
@@ -129,7 +134,8 @@ void load_bootloader()
   fclose(bl);
 }
 
-void create_cores()
+void
+create_cores()
 {
   core_start_flags = malloc(cmd_options.core * sizeof(u8));
   core_start_flags[0] = 1; // 首先开启核心0
@@ -147,7 +153,8 @@ void create_cores()
   }
 }
 
-void deal_with_cmdline(int argc, char **argv)
+void
+deal_with_cmdline(int argc, char **argv)
 {
   cmd_options.bootloader = NULL;
   cmd_options.core = 0;
