@@ -23,6 +23,7 @@
 
 #if defined(__linux__)
 #include <unistd.h>
+#include <sys/time.h>
 #include <dlfcn.h>
 #elif defined(_WIN32)
 #include <windows.h>
@@ -206,23 +207,35 @@ generate_interrupt:
   return 0;
 }
 
+static u64 get_us_time()
+{
+#if defined(__linux__)
+  static struct timeval time;
+  gettimeofday(&time, NULL);
+  return time.tv_sec * 1000 * 1000 + time.tv_usec;
+#elif defined(_WIN32)
+
+#endif
+}
+
 void *clock_producer(void *args)
 {
   u64 cid = *(u64 *)(((void **)args)[1]);
   _core *core = (_core *)(((void **)args)[0]);
+  u64 last_time, current_time;
+  last_time = get_us_time();
   while (core_start_flags[cid])
   {
 #if defined(__linux__)
-    // 500 tick/s
-    usleep(1800);
+    current_time = get_us_time();
+    u64 slp_time = 2000 - (current_time - last_time);
+    while (slp_time)
+    {
+      slp_time = usleep(slp_time);
+    }
 #elif defined(_WIN32)
-    // 200 tick/s
-    Sleep(5);
+
 #endif
-    // while (core->interrupt.triggered)
-    //   ;
-    // core->interrupt.triggered = 1;
-    // core->interrupt.int_id = IR_CLOCK;
     // TODO 使用中断管理器发送中断
   }
 }
