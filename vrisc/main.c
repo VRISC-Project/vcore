@@ -11,7 +11,6 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
 #include <getopt.h>
 #include <string.h>
 #include <pthread.h>
@@ -155,7 +154,7 @@ void deal_with_cmdline(int argc, char **argv)
   cmd_options.extinsts = NULL;
   cmd_options.mem_size = 0;
   int opt;
-  while ((opt = getopt(argc, argv, "m:c:b:e")) != -1)
+  while ((opt = getopt(argc, argv, "m:c:b:e:t")) != -1)
   {
     switch (opt)
     {
@@ -178,6 +177,10 @@ void deal_with_cmdline(int argc, char **argv)
 
     case 'e': // 扩展指令集路径
       cmd_options.extinsts = optarg;
+      break;
+    
+    case 't': //屏蔽内部时钟
+      cmd_options.shield_internal_clock = 1;
       break;
 
     default:

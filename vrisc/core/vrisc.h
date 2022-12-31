@@ -18,8 +18,9 @@ struct options
 {
   u64 mem_size;
   u8 core;
-  char *bootloader; // 启动代码文件
-  char *extinsts;   // 扩展指令集路径
+  char *bootloader;         // 启动代码文件
+  char *extinsts;           // 扩展指令集路径
+  u8 shield_internal_clock; // 是否屏蔽内部时钟
 };
 
 extern char *exts_name[];
@@ -64,12 +65,21 @@ typedef struct core
     u8 triggered;
 
     u8 int_id;
-#define IR_DIV_BY_ZERO 0
-#define IR_NOT_EFFECTIVE_ADDRESS 1
-#define IR_DEVICES 2
-#define IR_CLOCK 3
-#define IR_INSTRUCTION_NOT_RECOGNIZED 4
+#define IR_DIV_BY_ZERO 0                // 除数为0
+#define IR_NOT_EFFECTIVE_ADDRESS 1      // 无效地址
+#define IR_DEVICES 2                    // 外部设备中断
+#define IR_CLOCK 3                      // 时钟
+#define IR_INSTRUCTION_NOT_RECOGNIZED 4 // 指令无法识别
+#define IR_PERMISSION_DENIED 5          // 权限错误
   } interrupt;
+
+  /*
+  在vrisc_core中有一个ipbuff变量用于存储ip转换的物理地址，
+  这个ipbuff在执行指令后随ip一同增加，当ipbuff进入下一个物理页
+  或执行了跳转类的指令时ipbuff会被重新计算；
+  此变量用于表示ipbuff是否需要刷新。
+   */
+  u8 ipbuff_need_flush;
 
 } _core;
 
@@ -82,9 +92,9 @@ extern u64 (*instructions)(u8 *, _core *);
 
 #endif
 
-u64 vtaddr(u64 ip, _core *core);
-
 void init_core();
+
+u64 vtaddr(u64 ip, _core *core, u8 test_or_address);
 
 void *vrisc_core(void *id);
 

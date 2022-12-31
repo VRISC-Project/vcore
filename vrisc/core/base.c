@@ -315,6 +315,7 @@ u64 jc(u8 *inst, _core *core)
   if (condition(cond, core->regs.flg))
   {
     core->regs.ip = tar;
+    core->ipbuff_need_flush = 1;
     return 0;
   }
   return opl + 2;
@@ -344,6 +345,7 @@ u64 cc(u8 *inst, _core *core)
   {
     core->regs.x[0] = core->regs.ip + opl + 2;
     core->regs.ip = tar;
+    core->ipbuff_need_flush = 1;
   }
   return opl + 2;
 }
@@ -351,6 +353,7 @@ u64 cc(u8 *inst, _core *core)
 u64 r(u8 *inst, _core *core)
 {
   core->regs.ip = core->regs.x[0];
+  core->ipbuff_need_flush = 1;
   return 0;
 }
 
@@ -365,6 +368,7 @@ u64 ir(u8 *inst, _core *core)
   }
   core->regs.flg = core->regs.x[1];
   core->regs.ip = core->regs.x[0];
+  core->ipbuff_need_flush = 1;
   if (mod == 1)
   {
     return 0;
@@ -380,6 +384,7 @@ u64 sysc(u8 *inst, _core *core)
   core->regs.x[0] = core->regs.ip;
   core->regs.flg |= 1 << 8;
   core->regs.ip = core->regs.scp;
+  core->ipbuff_need_flush = 1;
   return 0;
 }
 
@@ -387,6 +392,7 @@ u64 sysr(u8 *inst, _core *core)
 {
   core->regs.flg &= ~(1 << 8);
   core->regs.ip = core->regs.x[0];
+  core->ipbuff_need_flush = 1;
   return 1;
 }
 
@@ -489,12 +495,14 @@ u64 ldm(u8 *inst, _core *core)
   u8 addr = core->regs.x[src];
   if (addr > cmd_options.mem_size)
   {
-    core->interrupt.triggered = 1;
-    core->interrupt.int_id = IR_NOT_EFFECTIVE_ADDRESS;
+    // TODO 使用中断管理器产生中断IR_NOT_EFFECTIVE_ADDRESS
     return 0;
   }
-  // TODO 用户态权限检查
-  core->regs.x[tar] = *(u64 *)(memory + vtaddr(addr, core));
+  if (!vtaddr(addr, core, 1))
+  {
+    return 0;
+  }
+  core->regs.x[tar] = *(u64 *)(memory + vtaddr(addr, core, 0));
   return 2;
 }
 
@@ -506,12 +514,14 @@ u64 stm(u8 *inst, _core *core)
   u8 addr = core->regs.x[tar];
   if (addr > cmd_options.mem_size)
   {
-    core->interrupt.triggered = 1;
-    core->interrupt.int_id = IR_NOT_EFFECTIVE_ADDRESS;
+    // TODO 使用中断管理器产生中断IR_NOT_EFFECTIVE_ADDRESS
     return 0;
   }
-  // TODO 用户态权限检查
-  *(u64 *)(memory + vtaddr(addr, core)) = core->regs.x[src];
+  if (!vtaddr(addr, core, 1))
+  {
+    return 0;
+  }
+  *(u64 *)(memory + vtaddr(addr, core, 0)) = core->regs.x[src];
   return 2;
 }
 
@@ -548,7 +558,11 @@ u64 mv(u8 *inst, _core *core)
   u64 s, t;
   if (flg & 2)
   {
-    s = *(u64 *)(memory + vtaddr(core->regs.x[src], core));
+    if (!vtaddr(core->regs.x[src], core, 1))
+    {
+      return 0;
+    }
+    s = *(u64 *)(memory + vtaddr(core->regs.x[src], core, 0));
   }
   else
   {
@@ -557,7 +571,11 @@ u64 mv(u8 *inst, _core *core)
 
   if (flg & 1)
   {
-    *(u64 *)(memory + vtaddr(core->regs.x[tar], core)) = s;
+    if (!vtaddr(core->regs.x[tar], core, 1))
+    {
+      return 0;
+    }
+    *(u64 *)(memory + vtaddr(core->regs.x[tar], core, 0)) = s;
   }
   else
   {
