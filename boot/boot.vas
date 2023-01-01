@@ -19,7 +19,7 @@ hit_nea:
 start:
     //开启中断
     ldi ir_div_by_zero,x0
-    xor x1,x1
+    xor x1,x1,x1
     stm x0,x1
 
     livt x1
@@ -39,7 +39,7 @@ start:
         loop x1,@F
 
 ir_div_by_zero:
-    ir 1
+    ir 2
 
 ir_not_effective_address:
     mv x0,x15
@@ -49,19 +49,19 @@ ir_not_effective_address:
     ldi 0,x1
     stm x1,x0
 
-    mv x14,x1
     mv x15,x0
+    mv x14,x1
 
     ir 2
 
 ir_devices:
-    ir 1
+    ir 2
 
 ir_clock:
-    ir 1
+    ir 2
 
 ir_instruction_not_recognized:
-    ir 1
+    ir 2
 
 ir_permission_denied:
     @:

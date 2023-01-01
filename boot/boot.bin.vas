@@ -1,0 +1,41 @@
+0000:   .b 0a,00    //j start(0x40)
+0002:   .w 40
+0004:   .d 0
+0008:   .q 69       //.q ir_not_effective_address(0x69)
+0010:   .q 7f       //.q ir_devices(0x7f)
+0018:   .q 81       //.q ir_clock(0x81)
+0020:   .q 83       //.q ir_instruction_not_recognized(0x83)
+0028:   .q 85       //.q ir_permission_denied(0x85)
+0030:   .q 0
+0038:   .q 1        //  <hit_nea>
+0040:   .b 15,00,67 //ldi ir_div_by_zero(0x67),x0 <start>
+0043:   .b 09,11,01 //xor x1,x1,x1
+0046:   .b 17,10    //stm x0,x1
+0048:   .b 1d,01    //livt x1
+004a:   .b 18       //ei
+004b:   .b 15,00,00 //ldi 0,x0
+004e:   .b 16,30    //ldm x0,x3 <@>
+0050:   .b 03,00    //inc x0
+0052:   .b 15,10,38 //ldi hit_nea(0x38),x1
+0055:   .b 16,11    //ldm x1,x1
+0057:   .b 10,01    //loop x1,@F(-9)
+0059:   .d fffffff7
+005d:   .b 15,10,01 //ldi 1,x1
+0060:   .b 00       //nop   <@>
+0061:   .b 10,01    //loop x1,@F(-1)
+0063:   .b ffffffff
+0067:   .b 0d,02    //ir 2  <ir_div_by_zero>
+0069:   .b 1c,00,f0 //mv x0,x15 <ir_not_effective_address>
+006c:   .b 1c,00,e1 //mv x1,x14
+006f:   .b 15,00,38 //ldi hit_nea(0x38),x0
+0072:   .b 15,10,00 //ldi 0,x1
+0075:   .b 17,01    //stm x1,x0
+0077:   .b 1c,00,0f //mv x15,x0
+007a:   .b 1c,00,1e //mv x14,x1
+007d:   .b 0d,02    //ir 2
+007f:   .b 0d,02    //ir 2  <ir_devices>
+0081:   .b 0d,02    //ir 2  <ir_clock>
+0083:   .b 0d,02    //ir 2  <ir_instruction_not_recognized>
+0085:   .b 00       //nop   <@><ir_permission_denied>
+0086:   .b 10,01    //loop x1,@F
+0088:   .d ffffffff
