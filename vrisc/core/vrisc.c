@@ -135,7 +135,7 @@ void intctl_addint(_core *core, u8 intid)
  */
 u64 vtaddr(u64 ip, _core *core, u8 test_or_address)
 {
-  if (core->regs.flg & (1 << 7))
+  if (!(core->regs.flg & (1 << 7)))
   { // 未开启分页
     if (test_or_address && (core->regs.flg & (1 << 8)))
     { // 处于用户态，不可以使用物理地址
@@ -147,7 +147,14 @@ u64 vtaddr(u64 ip, _core *core, u8 test_or_address)
       intctl_addint(core, IR_NOT_EFFECTIVE_ADDRESS);
       return 0;
     }
-    return ip;
+    if (test_or_address)
+    {
+      return 1;
+    }
+    else
+    {
+      return ip;
+    }
   }
 
   u8 addr_in_usermod = (ip & USERFLAG) ? 1 : 0;
@@ -369,7 +376,7 @@ inst_destext(_core *core, u64 *ipbuff)
 
 /* 中断控制器线程 */
 void *
-interrup_controller(void *args)
+interrupt_controller(void *args)
 {
   u64 cid = *(u64 *)(((void **)args)[1]);
   _core *core = (_core *)(((void **)args)[0]);
@@ -407,6 +414,7 @@ interrup_controller(void *args)
     core->interrupt.controller.iqtail = node->prev;
     core->interrupt.controller.iqtail->next = NULL;
     free(node);
+    core->interrupt.triggered = 1;
   }
 }
 
@@ -437,14 +445,14 @@ vrisc_core(void *id)
 
   pthread_t clock_id;
   void *args[2] = {core, &cid};
-  if (cmd_options.shield_internal_clock)
+  if (!cmd_options.shield_internal_clock)
   { // 开启内部时钟
     pthread_create(&clock_id, NULL, clock_producer, &args);
   }
 
   // 开启中断控制器
-  pthread_t interrup_controller_id;
-  pthread_create(&interrup_controller_id, NULL, interrup_controller, &args);
+  pthread_t interrupt_controller_id;
+  pthread_create(&interrupt_controller_id, NULL, interrupt_controller, &args);
 
   u64 ipbuff; // 此变量说明见 _core::ipbuff_need_flush
 
@@ -473,8 +481,7 @@ vrisc_core(void *id)
     }
     if (!(instructions[memory[vtaddr(core->regs.ip, core, 0)]]))
     { // 无效指令
-      core->interrupt.triggered = 1;
-      core->interrupt.int_id = IR_INSTRUCTION_NOT_RECOGNIZED;
+      intctl_addint(core, IR_INSTRUCTION_NOT_RECOGNIZED);
     }
     if ((core->regs.flg & (1 << 6)) && core->interrupt.triggered)
     { // 如果发生中断先进入中断
