@@ -490,11 +490,11 @@ vrisc_core(void *id)
       continue;
     }
     // 执行指令
-    u64 incr =
+    core->incr =
         (*instructions[*(memory + ipbuff)])(
             memory + ipbuff, core);
-    core->regs.ip += incr;
-    ipbuff += incr;
+    core->regs.ip += core->incr;
+    ipbuff += core->incr;
   }
 
   if (cmd_options.shield_internal_clock)

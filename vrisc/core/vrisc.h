@@ -93,6 +93,9 @@ typedef struct core
    */
   u8 ipbuff_need_flush;
 
+  /* 上一个指令的长度 */
+  u64 incr;
+
 } _core;
 
 #ifdef __vrisc_main__

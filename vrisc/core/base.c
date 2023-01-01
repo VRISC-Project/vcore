@@ -370,12 +370,12 @@ u64 ir(u8 *inst, _core *core)
   core->regs.ip = core->regs.x[0];
   core->ipbuff_need_flush = 1;
   if (mod == 1)
-  {
-    return 0;
+  { // retry模式
+    return -core->incr;
   }
   else
-  {
-    return 2;
+  { // skip模式
+    return 0;
   }
 }
 
@@ -402,8 +402,9 @@ u64 loop(u8 *inst, _core *core)
   if (core->regs.x[cond])
   {
     core->regs.x[cond]--;
-    u32 imm = *(u32 *)(inst + 2);
-    return imm;
+    i32 imm = *(i32 *)(inst + 2);
+    i64 imm64 = imm;
+    return *((u64 *)(&imm64));
   }
   else
   {
