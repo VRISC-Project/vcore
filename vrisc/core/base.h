@@ -53,5 +53,7 @@ u64 ssrg(u8 *inst, _core *core);
 u64 in(u8 *inst, _core *core);
 u64 out(u8 *inst, _core *core);
 u64 cut(u8 *inst, _core *core);
+u64 icut(u8 *inst, _core *core);
+u64 iexp(u8 *inst, _core *core);
 
 #endif

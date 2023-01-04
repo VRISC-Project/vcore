@@ -13,6 +13,16 @@
 
 extern struct options cmd_options;
 
+#define USER_MODE_CHECK(core) (core->regs.flg & (1 << 8))
+
+#define RPL_MODE_CHECK(core)                     \
+  {                                              \
+    if (USER_MODE_CHECK(core))                   \
+    {                                            \
+      intctl_addint(core, IR_PERMISSION_DENIED); \
+    }                                            \
+  }
+
 u64 add(u8 *inst, _core *core)
 {
   u8 srcs = inst[1];
@@ -359,6 +369,7 @@ u64 r(u8 *inst, _core *core)
 
 u64 ir(u8 *inst, _core *core)
 {
+  RPL_MODE_CHECK(core);
   u8 mod = inst[1];
   if (!mod)
   {
@@ -390,6 +401,7 @@ u64 sysc(u8 *inst, _core *core)
 
 u64 sysr(u8 *inst, _core *core)
 {
+  RPL_MODE_CHECK(core);
   core->regs.flg &= ~(1 << 8);
   core->regs.ip = core->regs.x[0];
   core->ipbuff_need_flush = 1;
@@ -493,7 +505,7 @@ u64 ldm(u8 *inst, _core *core)
   u8 tar = inst[1];
   u8 src = tar % 16;
   tar >>= 4;
-  u8 addr = core->regs.x[src];
+  u64 addr = core->regs.x[src];
   if (!vtaddr(addr, core, 1))
   {
     return 0;
@@ -518,24 +530,28 @@ u64 stm(u8 *inst, _core *core)
 
 u64 ei(u8 *inst, _core *core)
 {
+  RPL_MODE_CHECK(core);
   core->regs.flg |= 1 << 6;
   return 1;
 }
 
 u64 di(u8 *inst, _core *core)
 {
+  RPL_MODE_CHECK(core);
   core->regs.flg &= ~(1 << 6);
   return 1;
 }
 
 u64 ep(u8 *inst, _core *core)
 {
+  RPL_MODE_CHECK(core);
   core->regs.flg |= 1 << 7;
   return 1;
 }
 
 u64 dp(u8 *inst, _core *core)
 {
+  RPL_MODE_CHECK(core);
   core->regs.flg &= ~(1 << 7);
   return 1;
 }
@@ -577,6 +593,7 @@ u64 mv(u8 *inst, _core *core)
 
 u64 livt(u8 *inst, _core *core)
 {
+  RPL_MODE_CHECK(core);
   u8 src = inst[1];
   core->regs.ivt = core->regs.x[src];
   return 2;
@@ -584,6 +601,7 @@ u64 livt(u8 *inst, _core *core)
 
 u64 lkpt(u8 *inst, _core *core)
 {
+  RPL_MODE_CHECK(core);
   u8 src = inst[1];
   core->regs.kpt = core->regs.x[src];
   return 2;
@@ -591,6 +609,7 @@ u64 lkpt(u8 *inst, _core *core)
 
 u64 lupt(u8 *inst, _core *core)
 {
+  RPL_MODE_CHECK(core);
   u8 src = inst[1];
   core->regs.upt = core->regs.x[src];
   return 2;
@@ -598,6 +617,7 @@ u64 lupt(u8 *inst, _core *core)
 
 u64 lsrg(u8 *inst, _core *core)
 {
+  RPL_MODE_CHECK(core);
   u8 tar = inst[1];
   u8 src = tar % 16;
   tar >>= 4;
@@ -607,6 +627,7 @@ u64 lsrg(u8 *inst, _core *core)
 
 u64 ssrg(u8 *inst, _core *core)
 {
+  RPL_MODE_CHECK(core);
   u8 tar = inst[1];
   u8 src = tar % 16;
   tar >>= 4;
@@ -616,11 +637,15 @@ u64 ssrg(u8 *inst, _core *core)
 
 u64 in(u8 *inst, _core *core)
 {
+  RPL_MODE_CHECK(core);
+  // TODO in
   return 3;
 }
 
 u64 out(u8 *inst, _core *core)
 {
+  RPL_MODE_CHECK(core);
+  // TODO out
   return 3;
 }
 
@@ -641,9 +666,69 @@ u64 cut(u8 *inst, _core *core)
   {
     core->regs.x[src] = (u32)core->regs.x[src];
   }
-  else if (tar == 8)
+  // 不需要处理64位的
+  return 2;
+}
+
+u64 icut(u8 *inst, _core *core)
+{
+  u8 tar = inst[1];
+  u8 src = tar % 16;
+  tar >>= 4;
+  if (tar == 1)
   {
-    core->regs.x[src] = (u64)core->regs.x[src];
+    core->regs.x[src] = (i8)core->regs.x[src];
   }
+  else if (tar == 2)
+  {
+    core->regs.x[src] = (i16)core->regs.x[src];
+  }
+  else if (tar == 4)
+  {
+    core->regs.x[src] = (i32)core->regs.x[src];
+  }
+  // 不需要处理64位的
+  return 2;
+}
+
+u64 iexp(u8 *inst, _core *core)
+{
+  u8 tar = inst[1];
+  u8 src = tar % 16;
+  tar >>= 4;
+  if (tar == 1)
+  {
+    i8 temp = core->regs.x[src];
+    u8 sig = temp < 0 ? 1 : 0;
+    temp = -temp;
+    i64 temp64 = temp;
+    if (sig)
+    {
+      temp64 = -temp64;
+    }
+  }
+  else if (tar == 2)
+  {
+    i16 temp = core->regs.x[src];
+    u8 sig = temp < 0 ? 1 : 0;
+    temp = -temp;
+    i64 temp64 = temp;
+    if (sig)
+    {
+      temp64 = -temp64;
+    }
+  }
+  else if (tar == 4)
+  {
+    i32 temp = core->regs.x[src];
+    u8 sig = temp < 0 ? 1 : 0;
+    temp = -temp;
+    i64 temp64 = temp;
+    if (sig)
+    {
+      temp64 = -temp64;
+    }
+  }
+  // 不需要处理64位的
   return 2;
 }

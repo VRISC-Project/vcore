@@ -15,9 +15,18 @@
 #include <string.h>
 #include <pthread.h>
 
+#if defined(__linux__)
+#include <unistd.h>
+#include <signal.h>
+#elif defined(_WIN32)
+#include <windows.h>
+#endif
+
 #define __vrisc_main__
 
 #include "memc.h"
+#include "device_control.h"
+#include "intctl.h"
 #include "core/vrisc.h"
 #include "debug/debug.h"
 
@@ -37,12 +46,14 @@ void *console(void *thr);
 
 void join_cores();
 
-void make_vrisc_device();
+void terminal_sigint(i32);
 
-int
-main(int argc, char **argv)
+int main(int argc, char **argv)
 {
   deal_with_cmdline(argc, argv);
+
+  //设置终端发送的signal处理函数
+  signal(SIGINT, terminal_sigint);
 
   create_memory(cmd_options.mem_size);
 
@@ -52,18 +63,29 @@ main(int argc, char **argv)
 
   create_cores();
 
-  pthread_join((pthread_t)console(0), NULL);
+  make_vrisc_device();
+
+  pthread_t cons = (pthread_t)console(0);
+
+  pthread_t intctl;
+  pthread_create(&intctl, NULL, interrupt_global_controller, NULL);
 
   join_cores();
+  pthread_join(intctl, NULL);
+
+  pthread_join(cons, NULL);
+
+  remove_vrisc_device();
 }
 
-void
-make_vrisc_device()
-{ // TODO
+void terminal_sigint(i32 i)
+{
+  remove_vrisc_device();
+  printf("\b\bvrisc terminated.\n");
+  exit(0);
 }
 
-void
-join_cores()
+void join_cores()
 {
   for (u64 u = 0; u < cmd_options.core; u++)
   {
@@ -105,8 +127,7 @@ console(void *thr)
   }
 }
 
-void
-load_bootloader()
+void load_bootloader()
 {
   if (!cmd_options.bootloader)
   {
@@ -134,8 +155,7 @@ load_bootloader()
   fclose(bl);
 }
 
-void
-create_cores()
+void create_cores()
 {
   core_start_flags = malloc(cmd_options.core * sizeof(u8));
   core_start_flags[0] = 1; // 首先开启核心0
@@ -145,7 +165,7 @@ create_cores()
   core_threads = malloc(cmd_options.core * sizeof(pthread_t *));
   for (u64 u = 0; u < cmd_options.core; u++)
   {
-    if (pthread_create((pthread_t *)(cores + u), NULL, vrisc_core, (void *)u))
+    if (pthread_create((pthread_t *)(core_threads + u), NULL, vrisc_core, (void *)u))
     {
       printf("Failed to create core#%d.\n", u);
       exit(CORE_FAILED);
@@ -153,8 +173,7 @@ create_cores()
   }
 }
 
-void
-deal_with_cmdline(int argc, char **argv)
+void deal_with_cmdline(int argc, char **argv)
 {
   cmd_options.bootloader = NULL;
   cmd_options.core = 0;
@@ -185,8 +204,8 @@ deal_with_cmdline(int argc, char **argv)
     case 'e': // 扩展指令集路径
       cmd_options.extinsts = optarg;
       break;
-    
-    case 't': //屏蔽内部时钟
+
+    case 't': // 屏蔽内部时钟
       cmd_options.shield_internal_clock = 1;
       break;
 

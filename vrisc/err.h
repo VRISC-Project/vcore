@@ -1,12 +1,12 @@
 /**
  * @file err.h
  * @author pointer-to-bios (pointer-to-bios@outlook.com)
- * @brief 
+ * @brief
  * @version 0.1
  * @date 2022-12-17
- * 
+ *
  * @copyright Copyright (c) 2022 Random World Studio
- * 
+ *
  */
 
 #define MEM_FAILED -1
@@ -18,3 +18,6 @@
 #define CORE_NUM_IS_ZERO -7
 #define NO_BOOTLOADER -8
 #define NO_EXTINSTS -9
+#define SHM_FAILED -10
+#define TRUNCATE_FAILED -11
+#define MAP_FAILED -12

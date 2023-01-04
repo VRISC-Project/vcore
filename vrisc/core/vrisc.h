@@ -13,104 +13,40 @@
 #define __vrisc_h__
 
 #include "../types.h"
-
-struct options
-{
-  u64 mem_size;
-  u8 core;
-  char *bootloader;         // 启动代码文件
-  char *extinsts;           // 扩展指令集路径
-  u8 shield_internal_clock; // 是否屏蔽内部时钟
-};
+#include "pubstruc.h"
 
 extern char *exts_name[];
-
-// 中断队列节点
-typedef struct interrupt_queue_node
-{
-  u8 id;
-  struct interrupt_queue_node *prev, *next;
-} interrupt_queue_node;
-
-typedef struct core
-{
-  struct regs
-  {
-    /*
-    64位：x
-    32位：d
-    16位：w
-    8位：b
-    */
-    u64 x[16];
-    /* flg
-    ^0-equal
-    ^1-bigger
-    ^2-smaller
-    ^3-zero
-    ^4-signal
-    ^5-overflow
-    ^6-interrupt enable
-    ^7-paging enable
-    ^8-privilege level(effective when paging enabled)
-      0-kernel
-      1-user
-    ^9-higher
-    ^10-lower
-     */
-    u64 flg;
-    u64 ip;
-    u64 usb, ust; // 用户态栈帧
-    u64 ksb, kst; // 内核态栈帧
-    u64 kpt, upt; // 内核态和用户态页表指针
-    u64 ivt;      // 中断向量表
-    u64 scp;      // 系统调用指针
-  } regs;
-
-  struct interrupt
-  {
-    u8 triggered;
-    u8 int_id;
-#define IR_DIV_BY_ZERO 0                // 除数为0
-#define IR_NOT_EFFECTIVE_ADDRESS 1      // 无效地址
-#define IR_DEVICES 2                    // 外部设备中断
-#define IR_CLOCK 3                      // 时钟
-#define IR_INSTRUCTION_NOT_RECOGNIZED 4 // 指令无法识别
-#define IR_PERMISSION_DENIED 5          // 权限错误
-
-    struct controller
-    {
-      interrupt_queue_node *interrupt_queue; // 中断队列
-      interrupt_queue_node *iqtail;          // 中断队列的结尾
-    } controller;
-  } interrupt;
-
-  /*
-  在vrisc_core中有一个ipbuff变量用于存储ip转换的物理地址，
-  这个ipbuff在执行指令后随ip一同增加，当ipbuff进入下一个物理页
-  或执行了跳转类的指令时ipbuff会被重新计算；
-  此变量用于表示ipbuff是否需要刷新。
-   */
-  u8 ipbuff_need_flush;
-
-  /* 上一个指令的长度 */
-  u64 incr;
-
-} _core;
 
 #ifdef __vrisc_main__
 
 extern u8 *core_start_flags;
-extern _core **cores;
 
 extern u64 (*instructions)(u8 *, _core *);
 
 #endif
 
+extern _core **cores;
+extern u8 *core_start_flags;
+
+extern struct options cmd_options;
+
 // 初始化vrisc核心
 void init_core();
 
 // 寻址
+#define LEVEL4_PTS_AREA (0x003ff00000000000)
+#define LEVEL3_PTS_AREA (0x00000ffc00000000)
+#define LEVEL2_PTS_AREA (0x00000003ff000000)
+#define LEVEL1_PTS_AREA (0x0000000000ffc000)
+#define PAGE_OFFSET (0x0000000000003fff)
+#define LEVEL4_BIGPAGE_OFFSET (LEVEL3_PTS_AREA | LEVEL2_PTS_AREA | LEVEL1_PTS_AREA | PAGE_OFFSET)
+#define LEVEL3_BIGPAGE_OFFSET (LEVEL2_PTS_AREA | LEVEL1_PTS_AREA | PAGE_OFFSET)
+#define LEVEL2_BIGPAGE_OFFSET (LEVEL1_PTS_AREA | PAGE_OFFSET)
+#define LEVEL4_PTS_OFFSET (44)
+#define LEVEL3_PTS_OFFSET (34)
+#define LEVEL2_PTS_OFFSET (24)
+#define LEVEL1_PTS_OFFSET (14)
+#define USERFLAG (0x8000000000000000)
 u64 vtaddr(u64 ip, _core *core, u8 test_or_address);
 
 // vrisc核心线程

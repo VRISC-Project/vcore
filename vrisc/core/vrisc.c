@@ -31,11 +31,6 @@
 
 #include "base.h"
 
-extern struct options cmd_options;
-
-u8 *core_start_flags;
-_core **cores;
-
 /*
 指令集的指令执行函数数组。
 通过malloc分配数组空间。
@@ -94,40 +89,10 @@ void init_core()
   instructions[36] = in;
   instructions[37] = out;
   instructions[38] = cut;
+  instructions[39] = icut;
+  instructions[40] = iexp;
 }
 
-/* 添加一个中断 */
-void intctl_addint(_core *core, u8 intid)
-{
-  interrupt_queue_node *adder = malloc(sizeof(interrupt_queue_node));
-  adder->id = intid;
-  adder->next = core->interrupt.controller.interrupt_queue;
-  adder->prev = NULL;
-  if (core->interrupt.controller.interrupt_queue)
-  {
-    core->interrupt.controller.interrupt_queue->prev = adder;
-  }
-  else
-  {
-    core->interrupt.controller.interrupt_queue = adder;
-    core->interrupt.controller.iqtail = adder;
-  }
-  core->interrupt.controller.interrupt_queue = adder;
-}
-
-#define LEVEL4_PTS_AREA (0x003ff00000000000)
-#define LEVEL3_PTS_AREA (0x00000ffc00000000)
-#define LEVEL2_PTS_AREA (0x00000003ff000000)
-#define LEVEL1_PTS_AREA (0x0000000000ffc000)
-#define PAGE_OFFSET (0x0000000000003fff)
-#define LEVEL4_BIGPAGE_OFFSET (LEVEL3_PTS_AREA | LEVEL2_PTS_AREA | LEVEL1_PTS_AREA | PAGE_OFFSET)
-#define LEVEL3_BIGPAGE_OFFSET (LEVEL2_PTS_AREA | LEVEL1_PTS_AREA | PAGE_OFFSET)
-#define LEVEL2_BIGPAGE_OFFSET (LEVEL1_PTS_AREA | PAGE_OFFSET)
-#define LEVEL4_PTS_OFFSET (44)
-#define LEVEL3_PTS_OFFSET (34)
-#define LEVEL2_PTS_OFFSET (24)
-#define LEVEL1_PTS_OFFSET (14)
-#define USERFLAG (0x8000000000000000)
 /* 寻址函数
 参数test_or_address为0时表示寻址，不为零表示测试地址有效性。
 测试地址有效性时，返回0为无效，非零为有效。
@@ -255,18 +220,25 @@ get_us_time()
 }
 #endif
 
+#define CLOCK_TICK 2000
 void *
 clock_producer(void *args)
 {
-  u64 cid = *(u64 *)(((void **)args)[1]);
-  _core *core = (_core *)(((void **)args)[0]);
+  _core *core = (_core *)(((_core **)args)[0]);
+  u64 cid = (u64)(((u64 *)args)[1]);
+  printf("%d:Thread %s on core#%d created.\n", getpid(), __func__, cid);
   u64 last_time, current_time;
   last_time = get_us_time();
   while (core_start_flags[cid])
   {
+    printf("tick.\n");
 #if defined(__linux__)
     current_time = get_us_time();
-    u64 slp_time = 2000 - (current_time - last_time);
+    i64 slp_time = CLOCK_TICK - (current_time - last_time);
+    if (slp_time < 0)
+    {
+      slp_time = 0;
+    }
     while (slp_time)
     {
       slp_time = usleep(slp_time);
@@ -276,21 +248,6 @@ clock_producer(void *args)
 #endif
     intctl_addint(core, IR_CLOCK);
   }
-}
-
-static void
-inst_nop(_core *core, u64 *ipbuff)
-{
-  while (!core->interrupt.triggered)
-  {
-#if defined(__linux__)
-    usleep(1000);
-#elif defined(_WIN32)
-    Sleep(1);
-#endif
-  }
-  core->regs.ip++;
-  (*ipbuff)++;
 }
 
 static char *
@@ -374,54 +331,74 @@ inst_destext(_core *core, u64 *ipbuff)
   (*ipbuff)++;
 }
 
-/* 中断控制器线程 */
-void *
-interrupt_controller(void *args)
+/* 添加一个中断 */
+void intctl_addint(_core *core, u8 intid)
 {
-  u64 cid = *(u64 *)(((void **)args)[1]);
-  _core *core = (_core *)(((void **)args)[0]);
-  while (core_start_flags[cid])
+  interrupt_queue_node *adder = malloc(sizeof(interrupt_queue_node));
+  adder->id = intid;
+  adder->next = core->interrupt.controller.interrupt_queue;
+  adder->prev = NULL;
+  u8_lock_lock(core->interrupt.controller.lock);
+  if (core->interrupt.controller.interrupt_queue)
   {
+    core->interrupt.controller.interrupt_queue->prev = adder;
+  }
+  else
+  {
+    core->interrupt.controller.interrupt_queue = adder;
+    core->interrupt.controller.iqtail = adder;
+  }
+  core->interrupt.controller.interrupt_queue = adder;
+  core->interrupt.controller.length++;
+  u8_lock_unlock(core->interrupt.controller.lock); // TODO 这句明明会执行但是lock不会变成0，不知道怎么回事
+}
+
+/* 本地中断控制函数 */
+// 这个不解开lock也可以，因为只有此函数会从中断队列末端取数据，
+// 而且它只有一处被调用。
+static void
+local_interrupt_controlling(_core *core)
+{
+  core->interrupt.triggered = 1;
+  core->interrupt.int_id = core->interrupt.controller.iqtail->id;
+
+  if (core->interrupt.controller.length == 1)
+  {
+    free(core->interrupt.controller.interrupt_queue);
+    core->interrupt.controller.interrupt_queue = NULL;
+    core->interrupt.controller.iqtail = NULL;
+    core->interrupt.controller.length = 0;
+    return;
+  }
+  interrupt_queue_node *node = core->interrupt.controller.iqtail;
+  core->interrupt.controller.iqtail = node->prev;
+  core->interrupt.controller.iqtail->next = NULL;
+  free(node);
+  core->interrupt.controller.length--;
+  core->interrupt.triggered = 1;
+}
+
+static void
+inst_nop(_core *core, u64 *ipbuff)
+{
+  while (!core->interrupt.triggered)
+  {
+    local_interrupt_controlling(core);
 #if defined(__linux__)
-    usleep(100);
+    usleep(1000);
 #elif defined(_WIN32)
     Sleep(1);
 #endif
-    // 队列为空
-    if (!core->interrupt.controller.interrupt_queue &&
-        !core->interrupt.controller.iqtail)
-    {
-      continue;
-    }
-    // 上一个中断未被处理
-    if (core->interrupt.triggered)
-    {
-      continue;
-    }
-
-    core->interrupt.triggered = 1;
-    core->interrupt.int_id = core->interrupt.controller.iqtail->id;
-
-    if (core->interrupt.controller.interrupt_queue ==
-        core->interrupt.controller.iqtail)
-    {
-      free(core->interrupt.controller.interrupt_queue);
-      core->interrupt.controller.interrupt_queue = NULL;
-      core->interrupt.controller.iqtail = NULL;
-      continue;
-    }
-    interrupt_queue_node *node = core->interrupt.controller.iqtail;
-    core->interrupt.controller.iqtail = node->prev;
-    core->interrupt.controller.iqtail->next = NULL;
-    free(node);
-    core->interrupt.triggered = 1;
   }
+  core->regs.ip++;
+  (*ipbuff)++;
 }
 
 void *
 vrisc_core(void *id)
 {
   u64 cid = (u64)id;
+  printf("%d:Core#%d created.\n", getpid(), cid);
   _core *core = malloc(sizeof(_core)); // 构造核心
   if (!core)
   {
@@ -431,7 +408,6 @@ vrisc_core(void *id)
   cores[cid] = core; // 注册核心
   memset((void *)core, 0, sizeof(_core));
   core->ipbuff_need_flush = 1;
-  printf("Created core#%d.\n", (u64)id);
 
   // 等待核心被允许开启
   while (!core_start_flags[cid])
@@ -444,15 +420,11 @@ vrisc_core(void *id)
   }
 
   pthread_t clock_id;
-  void *args[2] = {core, &cid};
+  void *args[2] = {core, (void *)cid};
   if (!cmd_options.shield_internal_clock)
   { // 开启内部时钟
-    pthread_create(&clock_id, NULL, clock_producer, &args);
+    pthread_create(&clock_id, NULL, clock_producer, args);
   }
-
-  // 开启中断控制器
-  pthread_t interrupt_controller_id;
-  pthread_create(&interrupt_controller_id, NULL, interrupt_controller, &args);
 
   u64 ipbuff; // 此变量说明见 _core::ipbuff_need_flush
 
@@ -462,6 +434,12 @@ vrisc_core(void *id)
     { // 刷新ipbuff
       ipbuff = vtaddr(core->regs.ip, core, 0);
       core->ipbuff_need_flush = 0;
+    }
+
+    if (core->interrupt.controller.length &&
+        !core->interrupt.triggered)
+    { // 可以处理下一个中断
+      local_interrupt_controlling(core);
     }
 
     if (!*(memory + vtaddr(core->regs.ip, core, 0)))
