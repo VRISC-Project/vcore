@@ -39,6 +39,7 @@ start:
         loop x1,@F
 
 ir_div_by_zero:
+    ei
     ir 2
 
 ir_not_effective_address:
@@ -52,15 +53,19 @@ ir_not_effective_address:
     mv x15,x0
     mv x14,x1
 
+    ei
     ir 2
 
 ir_devices:
+    ei
     ir 2
 
 ir_clock:
+    ei
     ir 2
 
 ir_instruction_not_recognized:
+    ei
     ir 2
 
 ir_permission_denied:
