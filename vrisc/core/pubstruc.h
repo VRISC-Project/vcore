@@ -23,13 +23,6 @@ struct options
   u8 shield_internal_clock; // 是否屏蔽内部时钟
 };
 
-// 中断队列节点
-typedef struct interrupt_queue_node
-{
-  u8 id;
-  struct interrupt_queue_node *prev, *next;
-} interrupt_queue_node;
-
 typedef struct core
 {
   struct regs
@@ -72,10 +65,20 @@ typedef struct core
 
     struct controller
     {
+#define LOCAL_INTQUEUE_BUFFER_SIZE 4096
       u8 lock;
-      interrupt_queue_node *interrupt_queue; // 中断队列
-      interrupt_queue_node *iqtail;          // 中断队列的结尾
-      u64 length;                            // 队列长度
+      u8 interrupt_queue[LOCAL_INTQUEUE_BUFFER_SIZE]; // 中断队列
+      u8 head;
+      u8 tail;
+#define LOCAL_INTQUEUE_LEN(ctller, len)                           \
+  if (ctller.tail < ctller.head)                                  \
+  {                                                               \
+    len = ctller.tail + LOCAL_INTQUEUE_BUFFER_SIZE - ctller.head; \
+  }                                                               \
+  else                                                            \
+  {                                                               \
+    len = ctller.tail - ctller.head;                              \
+  }
     } controller;
   } interrupt;
 
@@ -106,7 +109,7 @@ typedef struct vrisc_dev
 #define u8_lock_lock(lock) \
   {                        \
     while (lock)           \
-      ;                    \
+      usleep(50);          \
     lock = 1;              \
   }
 

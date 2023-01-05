@@ -226,12 +226,10 @@ clock_producer(void *args)
 {
   _core *core = (_core *)(((_core **)args)[0]);
   u64 cid = (u64)(((u64 *)args)[1]);
-  printf("%d:Thread %s on core#%d created.\n", getpid(), __func__, cid);
   u64 last_time, current_time;
   last_time = get_us_time();
   while (core_start_flags[cid])
   {
-    printf("tick.\n");
 #if defined(__linux__)
     current_time = get_us_time();
     i64 slp_time = CLOCK_TICK - (current_time - last_time);
@@ -334,48 +332,33 @@ inst_destext(_core *core, u64 *ipbuff)
 /* 添加一个中断 */
 void intctl_addint(_core *core, u8 intid)
 {
-  interrupt_queue_node *adder = malloc(sizeof(interrupt_queue_node));
-  adder->id = intid;
-  adder->next = core->interrupt.controller.interrupt_queue;
-  adder->prev = NULL;
+  while (
+      core->interrupt.controller.head ==
+      core->interrupt.controller.tail + 1)
+    usleep(50); // 如果队列满了要等待
   u8_lock_lock(core->interrupt.controller.lock);
-  if (core->interrupt.controller.interrupt_queue)
+  core->interrupt.controller.interrupt_queue[core->interrupt.controller.tail] = intid;
+  core->interrupt.controller.tail++;
+  if (core->interrupt.controller.tail == LOCAL_INTQUEUE_BUFFER_SIZE)
   {
-    core->interrupt.controller.interrupt_queue->prev = adder;
+    core->interrupt.controller.tail = 0;
   }
-  else
-  {
-    core->interrupt.controller.interrupt_queue = adder;
-    core->interrupt.controller.iqtail = adder;
-  }
-  core->interrupt.controller.interrupt_queue = adder;
-  core->interrupt.controller.length++;
-  u8_lock_unlock(core->interrupt.controller.lock); // TODO 这句明明会执行但是lock不会变成0，不知道怎么回事
+  u8_lock_unlock(core->interrupt.controller.lock);
 }
 
 /* 本地中断控制函数 */
-// 这个不解开lock也可以，因为只有此函数会从中断队列末端取数据，
-// 而且它只有一处被调用。
 static void
 local_interrupt_controlling(_core *core)
 {
   core->interrupt.triggered = 1;
-  core->interrupt.int_id = core->interrupt.controller.iqtail->id;
-
-  if (core->interrupt.controller.length == 1)
+  core->interrupt.int_id = core->interrupt.controller.interrupt_queue[core->interrupt.controller.head];
+  u8_lock_lock(core->interrupt.controller.lock);
+  core->interrupt.controller.head++;
+  if (core->interrupt.controller.head == LOCAL_INTQUEUE_BUFFER_SIZE)
   {
-    free(core->interrupt.controller.interrupt_queue);
-    core->interrupt.controller.interrupt_queue = NULL;
-    core->interrupt.controller.iqtail = NULL;
-    core->interrupt.controller.length = 0;
-    return;
+    core->interrupt.controller.head = 0;
   }
-  interrupt_queue_node *node = core->interrupt.controller.iqtail;
-  core->interrupt.controller.iqtail = node->prev;
-  core->interrupt.controller.iqtail->next = NULL;
-  free(node);
-  core->interrupt.controller.length--;
-  core->interrupt.triggered = 1;
+  u8_lock_unlock(core->interrupt.controller.lock);
 }
 
 static void
@@ -398,7 +381,6 @@ void *
 vrisc_core(void *id)
 {
   u64 cid = (u64)id;
-  printf("%d:Core#%d created.\n", getpid(), cid);
   _core *core = malloc(sizeof(_core)); // 构造核心
   if (!core)
   {
@@ -436,7 +418,9 @@ vrisc_core(void *id)
       core->ipbuff_need_flush = 0;
     }
 
-    if (core->interrupt.controller.length &&
+    if ((
+            core->interrupt.controller.head !=
+            core->interrupt.controller.tail) &&
         !core->interrupt.triggered)
     { // 可以处理下一个中断
       local_interrupt_controlling(core);

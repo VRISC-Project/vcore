@@ -31,7 +31,6 @@
 void *
 interrupt_global_controller(void *args)
 {
-  printf("%d:Thread %s created.\n", getpid(), __func__);
   // 打开共享内存fd
   char *intctl_namestr = generate_intctl_namestr(vrisc_device_id);
   u32 intctlf = shm_open(intctl_namestr, O_CREAT | O_TRUNC | O_RDWR, 0777);
@@ -90,8 +89,9 @@ interrupt_global_controller(void *args)
       u32 shortest = 0xffffffff;
       for (u32 i = 0; i < cmd_options.core; i++)
       {
-        if (core_start_flags[i] &&
-            cores[i]->interrupt.controller.length < shortest)
+        u32 len;
+        LOCAL_INTQUEUE_LEN(cores[i]->interrupt.controller, len);
+        if (core_start_flags[i] && len < shortest)
         {
           core_id = i;
         }
