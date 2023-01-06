@@ -65,7 +65,7 @@ typedef struct core
 
     struct controller
     {
-#define LOCAL_INTQUEUE_BUFFER_SIZE 4096
+#define LOCAL_INTQUEUE_BUFFER_SIZE 8192
       u8 lock;
       u8 interrupt_queue[LOCAL_INTQUEUE_BUFFER_SIZE]; // 中断队列
       u8 head;
@@ -89,6 +89,22 @@ typedef struct core
   此变量用于表示ipbuff是否需要刷新。
    */
   u8 ipbuff_need_flush;
+
+  /*
+  频繁地调用vtaddr会导致性能下降，
+  故使用此结构存储已经转换的地址
+   */
+  struct addressing_manager
+  {
+#define AM_AD_SIZE 256
+    struct vp_pair // 虚拟地址-物理地址对
+    {
+      u64 vt;
+      u64 ph;
+    } addressed_addresses[AM_AD_SIZE];
+    u8 begin, end;
+  } addressing_manager;
+  u8 am_should_flush;
 
   /* 上一个指令的长度 */
   u64 incr;

@@ -389,6 +389,7 @@ vrisc_core(void *id)
   }
   cores[cid] = core; // 注册核心
   memset((void *)core, 0, sizeof(_core));
+
   core->ipbuff_need_flush = 1;
 
   // 等待核心被允许开启
@@ -414,8 +415,51 @@ vrisc_core(void *id)
   {
     if (core->ipbuff_need_flush)
     { // 刷新ipbuff
-      ipbuff = vtaddr(core->regs.ip, core, 0);
-      core->ipbuff_need_flush = 0;
+      // 先在AM中寻找已经转换的地址
+      for (u8 i = core->addressing_manager.end; i != core->addressing_manager.begin; i--)
+      {
+        if (i == AM_AD_SIZE)
+        {
+          i = 0;
+        }
+        if (core->addressing_manager.addressed_addresses[i].vt == core->regs.ip)
+        {
+          ipbuff = core->addressing_manager.addressed_addresses[i].ph;
+          core->ipbuff_need_flush = 0;
+          // 将这个地址推到末尾，防止过早地被刷新掉
+          struct vp_pair oni = core->addressing_manager.addressed_addresses[i];
+          for (u8 j = i; j != core->addressing_manager.end - 1; j++)
+          {
+            core->addressing_manager.addressed_addresses[j].vt =
+                core->addressing_manager.addressed_addresses[j + 1].vt;
+            core->addressing_manager.addressed_addresses[j].ph =
+                core->addressing_manager.addressed_addresses[j + 1].ph;
+          }
+          core->addressing_manager.addressed_addresses
+              [core->addressing_manager.end - 1]
+                  .vt = oni.vt;
+          core->addressing_manager.addressed_addresses
+              [core->addressing_manager.end - 1]
+                  .ph = oni.ph;
+          break;
+        }
+      }
+      if (core->ipbuff_need_flush)
+      {
+        ipbuff = vtaddr(core->regs.ip, core, 0);
+        core->ipbuff_need_flush = 0;
+        // 新寻址后的地址存入AM中
+        if (core->addressing_manager.begin - 1 ==
+            core->addressing_manager.end)
+        {
+          core->addressing_manager.begin += 64;
+        }
+        core->addressing_manager.addressed_addresses
+            [core->addressing_manager.end++] =
+            (struct vp_pair){
+                .vt = core->regs.ip,
+                .ph = ipbuff};
+      }
     }
 
     if ((

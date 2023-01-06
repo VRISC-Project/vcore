@@ -367,7 +367,7 @@ u64 r(u8 *inst, _core *core)
   return 0;
 }
 
-u64 ir(u8 *inst, _core *core)
+volatile u64 ir(u8 *inst, _core *core)
 {
   RPL_MODE_CHECK(core);
   u8 mod = inst[1];
