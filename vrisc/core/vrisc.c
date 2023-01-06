@@ -377,6 +377,63 @@ inst_nop(_core *core, u64 *ipbuff)
   (*ipbuff)++;
 }
 
+static void
+flash_ipbuff(_core *core, u64 *ipbuff)
+{
+  // 先在AM中寻找已经转换的地址
+  for (u8 i = core->addressing_manager.end; i != core->addressing_manager.begin; i--)
+  {
+    if (i == AM_AD_SIZE)
+    {
+      i = 0;
+    }
+    if (core->addressing_manager.addressed_addresses[i].vt == core->regs.ip)
+    {
+      *ipbuff = core->addressing_manager.addressed_addresses[i].ph;
+      core->ipbuff_need_flash = 0;
+      // 将这个地址推到末尾，防止过早地被刷新掉
+      struct vp_pair oni = core->addressing_manager.addressed_addresses[i];
+      for (u8 j = i; j != core->addressing_manager.end - 1; j++)
+      {
+        core->addressing_manager.addressed_addresses[j].vt =
+            core->addressing_manager.addressed_addresses[j + 1].vt;
+        core->addressing_manager.addressed_addresses[j].ph =
+            core->addressing_manager.addressed_addresses[j + 1].ph;
+      }
+      core->addressing_manager.addressed_addresses
+          [core->addressing_manager.end - 1]
+              .vt = oni.vt;
+      core->addressing_manager.addressed_addresses
+          [core->addressing_manager.end - 1]
+              .ph = oni.ph;
+      break;
+    }
+  }
+  if (core->ipbuff_need_flash)
+  {
+    *ipbuff = vtaddr(core->regs.ip, core, 0);
+    core->ipbuff_need_flash = 0;
+    // 新寻址后的地址存入AM中
+    if (core->addressing_manager.begin - 1 ==
+        core->addressing_manager.end)
+    {
+      core->addressing_manager.begin += 64;
+    }
+    core->addressing_manager.addressed_addresses
+        [core->addressing_manager.end++] =
+        (struct vp_pair){
+            .vt = core->regs.ip,
+            .ph = *ipbuff};
+  }
+  // 如果需要刷新寻址管理器
+  if (core->am_need_flash)
+  {
+    core->addressing_manager.begin = 0;
+    core->addressing_manager.end = 0;
+    core->am_need_flash = 0;
+  }
+}
+
 void *
 vrisc_core(void *id)
 {
@@ -390,7 +447,7 @@ vrisc_core(void *id)
   cores[cid] = core; // 注册核心
   memset((void *)core, 0, sizeof(_core));
 
-  core->ipbuff_need_flush = 1;
+  core->ipbuff_need_flash = 1;
 
   // 等待核心被允许开启
   while (!core_start_flags[cid])
@@ -413,53 +470,9 @@ vrisc_core(void *id)
 
   while (core_start_flags[cid])
   {
-    if (core->ipbuff_need_flush)
+    if (core->ipbuff_need_flash)
     { // 刷新ipbuff
-      // 先在AM中寻找已经转换的地址
-      for (u8 i = core->addressing_manager.end; i != core->addressing_manager.begin; i--)
-      {
-        if (i == AM_AD_SIZE)
-        {
-          i = 0;
-        }
-        if (core->addressing_manager.addressed_addresses[i].vt == core->regs.ip)
-        {
-          ipbuff = core->addressing_manager.addressed_addresses[i].ph;
-          core->ipbuff_need_flush = 0;
-          // 将这个地址推到末尾，防止过早地被刷新掉
-          struct vp_pair oni = core->addressing_manager.addressed_addresses[i];
-          for (u8 j = i; j != core->addressing_manager.end - 1; j++)
-          {
-            core->addressing_manager.addressed_addresses[j].vt =
-                core->addressing_manager.addressed_addresses[j + 1].vt;
-            core->addressing_manager.addressed_addresses[j].ph =
-                core->addressing_manager.addressed_addresses[j + 1].ph;
-          }
-          core->addressing_manager.addressed_addresses
-              [core->addressing_manager.end - 1]
-                  .vt = oni.vt;
-          core->addressing_manager.addressed_addresses
-              [core->addressing_manager.end - 1]
-                  .ph = oni.ph;
-          break;
-        }
-      }
-      if (core->ipbuff_need_flush)
-      {
-        ipbuff = vtaddr(core->regs.ip, core, 0);
-        core->ipbuff_need_flush = 0;
-        // 新寻址后的地址存入AM中
-        if (core->addressing_manager.begin - 1 ==
-            core->addressing_manager.end)
-        {
-          core->addressing_manager.begin += 64;
-        }
-        core->addressing_manager.addressed_addresses
-            [core->addressing_manager.end++] =
-            (struct vp_pair){
-                .vt = core->regs.ip,
-                .ph = ipbuff};
-      }
+      flash_ipbuff(core, &ipbuff);
     }
 
     if ((
@@ -499,7 +512,7 @@ vrisc_core(void *id)
       core->regs.flg &= ~(1 << 8); // 进入内核态
       // 让ip寄存器跳到中断处理程序
       core->regs.ip = *(u64 *)(memory + core->regs.ivt + core->interrupt.int_id * 8);
-      core->ipbuff_need_flush = 1;
+      core->ipbuff_need_flash = 1;
       continue;
     }
     // 执行指令

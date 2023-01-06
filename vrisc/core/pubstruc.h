@@ -88,7 +88,7 @@ typedef struct core
   或执行了跳转类的指令时ipbuff会被重新计算；
   此变量用于表示ipbuff是否需要刷新。
    */
-  u8 ipbuff_need_flush;
+  u8 ipbuff_need_flash;
 
   /*
   频繁地调用vtaddr会导致性能下降，
@@ -104,7 +104,7 @@ typedef struct core
     } addressed_addresses[AM_AD_SIZE];
     u8 begin, end;
   } addressing_manager;
-  u8 am_should_flush;
+  u8 am_need_flash;
 
   /* 上一个指令的长度 */
   u64 incr;

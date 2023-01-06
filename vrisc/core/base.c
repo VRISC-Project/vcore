@@ -325,7 +325,7 @@ u64 jc(u8 *inst, _core *core)
   if (condition(cond, core->regs.flg))
   {
     core->regs.ip = tar;
-    core->ipbuff_need_flush = 1;
+    core->ipbuff_need_flash = 1;
     return 0;
   }
   return opl + 2;
@@ -355,7 +355,7 @@ u64 cc(u8 *inst, _core *core)
   {
     core->regs.x[0] = core->regs.ip + opl + 2;
     core->regs.ip = tar;
-    core->ipbuff_need_flush = 1;
+    core->ipbuff_need_flash = 1;
   }
   return opl + 2;
 }
@@ -363,7 +363,7 @@ u64 cc(u8 *inst, _core *core)
 u64 r(u8 *inst, _core *core)
 {
   core->regs.ip = core->regs.x[0];
-  core->ipbuff_need_flush = 1;
+  core->ipbuff_need_flash = 1;
   return 0;
 }
 
@@ -379,7 +379,7 @@ volatile u64 ir(u8 *inst, _core *core)
   }
   core->regs.flg = core->regs.x[1];
   core->regs.ip = core->regs.x[0];
-  core->ipbuff_need_flush = 1;
+  core->ipbuff_need_flash = 1;
   if (mod == 1)
   { // retry模式
     return -core->incr;
@@ -395,7 +395,7 @@ u64 sysc(u8 *inst, _core *core)
   core->regs.x[0] = core->regs.ip;
   core->regs.flg |= 1 << 8;
   core->regs.ip = core->regs.scp;
-  core->ipbuff_need_flush = 1;
+  core->ipbuff_need_flash = 1;
   return 0;
 }
 
@@ -404,7 +404,7 @@ u64 sysr(u8 *inst, _core *core)
   RPL_MODE_CHECK(core);
   core->regs.flg &= ~(1 << 8);
   core->regs.ip = core->regs.x[0];
-  core->ipbuff_need_flush = 1;
+  core->ipbuff_need_flash = 1;
   return 1;
 }
 
@@ -604,6 +604,7 @@ u64 lkpt(u8 *inst, _core *core)
   RPL_MODE_CHECK(core);
   u8 src = inst[1];
   core->regs.kpt = core->regs.x[src];
+  core->am_need_flash = 1;
   return 2;
 }
 
@@ -612,6 +613,7 @@ u64 lupt(u8 *inst, _core *core)
   RPL_MODE_CHECK(core);
   u8 src = inst[1];
   core->regs.upt = core->regs.x[src];
+  core->am_need_flash = 1;
   return 2;
 }
 
