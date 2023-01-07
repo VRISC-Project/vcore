@@ -21,3 +21,4 @@
 #define SHM_FAILED -10
 #define TRUNCATE_FAILED -11
 #define MAP_FAILED -12
+#define HAVE_VRISC_VCPU -13

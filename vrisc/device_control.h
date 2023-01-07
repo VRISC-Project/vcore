@@ -16,7 +16,6 @@
 #include "core/pubstruc.h"
 
 extern _core **cores;
-extern u32 vrisc_device_id;
 extern u8 *core_start_flags;
 extern struct options cmd_options;
 
@@ -24,7 +23,7 @@ void make_vrisc_device();
 void remove_vrisc_device();
 
 /* 产生共享内存名 */
-char *generate_intctl_namestr(u32 vrisc_id);
-char *generate_ioctl_namestr(u32 vrisc_id);
+char *generate_intctl_namestr();
+char *generate_ioctl_namestr();
 
 #endif

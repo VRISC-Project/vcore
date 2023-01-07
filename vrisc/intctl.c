@@ -32,7 +32,7 @@ void *
 interrupt_global_controller(void *args)
 {
   // 打开共享内存fd
-  char *intctl_namestr = generate_intctl_namestr(vrisc_device_id);
+  char *intctl_namestr = generate_intctl_namestr();
   u32 intctlf = shm_open(intctl_namestr, O_CREAT | O_TRUNC | O_RDWR, 0777);
   if (intctlf == -1)
   {

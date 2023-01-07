@@ -111,15 +111,6 @@ typedef struct core
 
 } _core;
 
-/* vrisc设备文件结构 */
-typedef struct vrisc_dev
-{
-  u32 intctl_shm_namestart;
-  u32 ioctl_shm_namestart;
-  u32 totlen; // 这是strs的总长度
-  u8 strs[0];
-} vrisc_dev;
-
 /* 锁操作 */
 #define u8_lock_unlock(lock) lock = 0;
 #define u8_lock_lock(lock) \
