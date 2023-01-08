@@ -13,6 +13,7 @@
 
 #include "device_control.h"
 #include "err.h"
+#include "core/pubstruc.h"
 #include "core/vrisc.h"
 
 #include <stdio.h>
@@ -32,8 +33,7 @@ void *
 interrupt_global_controller(void *args)
 {
   // 打开共享内存fd
-  char *intctl_namestr = generate_intctl_namestr();
-  u32 intctlf = shm_open(intctl_namestr, O_CREAT | O_TRUNC | O_RDWR, 0777);
+  u32 intctlf = shm_open(INTCTL_NAMESTR, O_CREAT | O_TRUNC | O_RDWR, 0777);
   if (intctlf == -1)
   {
     printf("Shared memory allocation failed.\n");
@@ -62,7 +62,7 @@ interrupt_global_controller(void *args)
   while (core_start_flags[0])
   { // 只要判断core#0是否在运行即可，因为core#0一定第一个开启，最后关闭
 #if defined(__linux__)
-    usleep(600);
+    usleep(700);
 #elif defined(_WIN32)
     Sleep(1);
 #endif
@@ -112,6 +112,5 @@ interrupt_global_controller(void *args)
 
   // 取消映射，删除共享内存
   munmap(ctl, sizeof(intctl_shm));
-  shm_unlink(intctl_namestr);
-  free(intctl_namestr);
+  shm_unlink(INTCTL_NAMESTR);
 }

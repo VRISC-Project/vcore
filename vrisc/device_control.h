@@ -22,8 +22,7 @@ extern struct options cmd_options;
 void make_vrisc_device();
 void remove_vrisc_device();
 
-/* 产生共享内存名 */
-char *generate_intctl_namestr();
-char *generate_ioctl_namestr();
+#define INTCTL_NAMESTR "vrisc-intctl"
+#define IOCTL_NAMESTR "vrisc-ioctl"
 
 #endif
