@@ -27,6 +27,7 @@
 #include "memc.h"
 #include "device_control.h"
 #include "intctl.h"
+#include "ioctl.h"
 #include "core/vrisc.h"
 #include "debug/debug.h"
 
@@ -67,8 +68,9 @@ int main(int argc, char **argv)
 
   pthread_t cons = (pthread_t)console(0);
 
-  pthread_t intctl;
+  pthread_t intctl, ioctl;
   pthread_create(&intctl, NULL, interrupt_global_controller, NULL);
+  pthread_create(&ioctl, NULL, io_global_controller, NULL);
 
   join_cores();
   pthread_join(intctl, NULL);

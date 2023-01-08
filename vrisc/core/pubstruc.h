@@ -62,6 +62,7 @@ typedef struct core
 #define IR_CLOCK 3                      // 时钟
 #define IR_INSTRUCTION_NOT_RECOGNIZED 4 // 指令无法识别
 #define IR_PERMISSION_DENIED 5          // 权限错误
+#define IR_IO_PORT_INVALID 6            // io端口无效
 
     struct controller
     {

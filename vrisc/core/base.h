@@ -13,6 +13,7 @@
 #define __base_h__
 
 #include "../types.h"
+#include "../ioctl.h"
 #include "vrisc.h"
 
 extern u8 *memory;

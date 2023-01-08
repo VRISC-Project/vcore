@@ -11,6 +11,8 @@
 
 #include "base.h"
 
+#include <unistd.h>
+
 extern struct options cmd_options;
 
 #define USER_MODE_CHECK(core) (core->regs.flg & (1 << 8))
@@ -20,6 +22,7 @@ extern struct options cmd_options;
     if (USER_MODE_CHECK(core))                   \
     {                                            \
       intctl_addint(core, IR_PERMISSION_DENIED); \
+      return 0;                                  \
     }                                            \
   }
 
@@ -640,14 +643,54 @@ u64 ssrg(u8 *inst, _core *core)
 u64 in(u8 *inst, _core *core)
 {
   RPL_MODE_CHECK(core);
-  // TODO in
+  u8 mvflag = inst[1];
+  u8 tar = mvflag % 16;
+  mvflag >>= 4;
+  u8 src = inst[2];
+  if (!mvflag)
+  {
+    src = (u8)core->regs.x[src];
+    if (src >= 64)
+    {
+      intctl_addint(core, IR_IO_PORT_INVALID);
+      return 0;
+    }
+  }
+  u8_lock_lock(io->input_locks[src]);
+  core->regs.x[tar] = io->input[src][io->input_heads[src]];
+  io->input_heads[src]++;
+  u8_lock_unlock(io->input_locks[src]);
   return 3;
 }
 
 u64 out(u8 *inst, _core *core)
 {
   RPL_MODE_CHECK(core);
-  // TODO out
+  u8 mvflag = inst[1];
+  u8 src = mvflag % 16;
+  mvflag >>= 4;
+  u8 tar = inst[2];
+  if (!mvflag)
+  {
+    tar = (u8)core->regs.x[tar];
+    if (tar >= 64)
+    {
+      intctl_addint(core, IR_IO_PORT_INVALID);
+      return 0;
+    }
+  }
+  u8_lock_lock(io->output_locks[tar]);
+  while (io->output_tails[tar] + 1 == io->output_heads[tar])
+  {
+#if defined(__linux__)
+    usleep(100);
+#elif defined(_WIN32)
+    Sleep(1);
+#endif
+  }
+  io->output[tar][io->output_tails[tar]] = core->regs.x[src];
+  io->output_tails[tar] += 1;
+  u8_lock_unlock(io->output_locks[tar]);
   return 3;
 }
 

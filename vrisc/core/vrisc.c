@@ -387,12 +387,12 @@ flash_ipbuff(_core *core, u64 *ipbuff)
     {
       i = 0;
     }
-    if (core->addressing_manager.addressed_addresses[i].vt == core->regs.ip)
+    struct vp_pair pair = core->addressing_manager.addressed_addresses[i];
+    if (pair.vt == core->regs.ip)
     {
-      *ipbuff = core->addressing_manager.addressed_addresses[i].ph;
+      *ipbuff = pair.ph;
       core->ipbuff_need_flash = 0;
       // 将这个地址推到末尾，防止过早地被刷新掉
-      struct vp_pair oni = core->addressing_manager.addressed_addresses[i];
       for (u8 j = i; j != core->addressing_manager.end - 1; j++)
       {
         core->addressing_manager.addressed_addresses[j].vt =
@@ -402,10 +402,10 @@ flash_ipbuff(_core *core, u64 *ipbuff)
       }
       core->addressing_manager.addressed_addresses
           [core->addressing_manager.end - 1]
-              .vt = oni.vt;
+              .vt = pair.vt;
       core->addressing_manager.addressed_addresses
           [core->addressing_manager.end - 1]
-              .ph = oni.ph;
+              .ph = pair.ph;
       break;
     }
   }
@@ -483,22 +483,22 @@ vrisc_core(void *id)
       local_interrupt_controlling(core);
     }
 
-    if (!*(memory + vtaddr(core->regs.ip, core, 0)))
+    if (!*(memory + ipbuff))
     { // nop
       inst_nop(core, &ipbuff);
       continue;
     }
-    if (*(memory + vtaddr(core->regs.ip, core, 0)) == 34)
+    if (*(memory + ipbuff) == 34)
     { // initext
       inst_initext(core, &ipbuff);
       continue;
     }
-    else if (*(memory + vtaddr(core->regs.ip, core, 0)) == 35)
+    else if (*(memory + ipbuff) == 35)
     { // destext
       inst_destext(core, &ipbuff);
       continue;
     }
-    if (!(instructions[memory[vtaddr(core->regs.ip, core, 0)]]))
+    if (!(instructions[memory[ipbuff]]))
     { // 无效指令
       intctl_addint(core, IR_INSTRUCTION_NOT_RECOGNIZED);
     }
