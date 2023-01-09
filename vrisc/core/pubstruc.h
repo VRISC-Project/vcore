@@ -25,6 +25,8 @@ struct options
 
 typedef struct core
 {
+  u64 id;
+
   struct regs
   {
     u64 x[16];
@@ -56,7 +58,6 @@ typedef struct core
   {
     u8 triggered;
     u8 int_id;
-#define IR_DIV_BY_ZERO 0                // 除数为0
 #define IR_NOT_EFFECTIVE_ADDRESS 1      // 无效地址
 #define IR_DEVICES 2                    // 外部设备中断
 #define IR_CLOCK 3                      // 时钟

@@ -23,10 +23,10 @@ u64 sub(u8 *inst, _core *core);
 u64 inc(u8 *inst, _core *core);
 u64 dec(u8 *inst, _core *core);
 u64 cmp(u8 *inst, _core *core);
-u64 _and (u8 * inst, _core *core);
-u64 _or (u8 * inst, _core *core);
+u64 _and(u8 *inst, _core *core);
+u64 _or(u8 *inst, _core *core);
 u64 not(u8 * inst, _core *core);
-u64 _xor (u8 * inst, _core *core);
+u64 _xor(u8 *inst, _core *core);
 u64 jc(u8 *inst, _core *core);
 u64 cc(u8 *inst, _core *core);
 u64 r(u8 *inst, _core *core);
@@ -56,5 +56,6 @@ u64 out(u8 *inst, _core *core);
 u64 cut(u8 *inst, _core *core);
 u64 icut(u8 *inst, _core *core);
 u64 iexp(u8 *inst, _core *core);
+u64 cpuid(u8 *inst, _core *core);
 
 #endif

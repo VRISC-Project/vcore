@@ -446,6 +446,7 @@ vrisc_core(void *id)
   }
   cores[cid] = core; // 注册核心
   memset((void *)core, 0, sizeof(_core));
+  core->id = cid;
 
   core->ipbuff_need_flash = 1;
 

@@ -11,9 +11,12 @@
 
 #include "base.h"
 
+#include <stdio.h>
 #include <unistd.h>
 
 extern struct options cmd_options;
+
+#define EOM_STR "RWS VCore 1B-2                  "
 
 #define USER_MODE_CHECK(core) (core->regs.flg & (1 << 8))
 
@@ -360,7 +363,7 @@ u64 cc(u8 *inst, _core *core)
     core->regs.ip = tar;
     core->ipbuff_need_flash = 1;
   }
-  return opl + 2;
+  return 0;
 }
 
 u64 r(u8 *inst, _core *core)
@@ -776,4 +779,33 @@ u64 iexp(u8 *inst, _core *core)
   }
   // 不需要处理64位的
   return 2;
+}
+
+u64 cpuid(u8 *inst, _core *core)
+{
+  switch (core->regs.x[0])
+  {
+  case 0:
+    core->regs.x[1] = ((u64 *)EOM_STR)[0];
+    core->regs.x[2] = ((u64 *)EOM_STR)[1];
+    core->regs.x[3] = ((u64 *)EOM_STR)[2];
+    core->regs.x[4] = ((u64 *)EOM_STR)[3];
+    break;
+
+  case 1:
+    core->regs.x[0] = cmd_options.core;
+    break;
+
+  case 2:
+    core->regs.x[0] = core->id;
+    break;
+
+  case 3:
+    printf((const char *)core->regs.x[1]);
+    break;
+  
+  default:
+    break;
+  }
+  return 1;
 }
