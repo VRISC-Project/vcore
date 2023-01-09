@@ -4,4 +4,4 @@ aux_source_directory(debug DBG)
 
 set(SRC ${MAIN} ${CORE} ${DBG})
 
-add_executable(vrisc ${SRC})
+add_executable(vcore ${SRC})
