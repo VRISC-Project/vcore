@@ -1,5 +1,3 @@
-.fmt raw
-
 .start 0x0
 .align 8
 
