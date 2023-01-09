@@ -5,42 +5,46 @@
 
 ivt:
     j start
+    .b 0
     .d 0
     .q ir_not_effective_address
     .q ir_devices
     .q ir_clock
     .q ir_instruction_not_recognized
     .q ir_permission_denied
-    .q 0
-
-hit_nea:
-    .q 1
+    .q ir_io_port_invalid
+    25 .q 0
 
 start:
-    //开启中断
-    ldi ir_div_by_zero,x0
-    xor x1,x1,x1
-    stm x0,x1
-
-    livt x1
+    //设置中断向量表
+    livt x0
     ei
 
-    //探测内存
+    c memtest
+
+//u64 memtest();
+memtest:
     ldi 0,x0
+    ldi 1,x2
     @:
+        //访问下一个内存
         ldm x0,x3
-        inc x0
+
+        //确定是否出现了ir_not_effective_address
         ldi hit_nea,x1
         ldm x1,x1
-        loop x1,@F
-    ldi 1,x1
-    @:
-        nop
-        loop x1,@F
+        cmp x2,x1
+        je @n
 
-ir_div_by_zero:
-    ei
-    ir 2
+        inc x0
+
+        j @p
+    @:
+
+    r
+
+hit_nea:    //出现nea后为1
+    .q 0
 
 ir_not_effective_address:
     mv x0,x15
@@ -70,5 +74,9 @@ ir_instruction_not_recognized:
 
 ir_permission_denied:
     @:
-        nop
-        loop x1,@F
+    nop
+    j @
+
+ir_io_port_invalid:
+    ei
+    ir 2
