@@ -18,6 +18,10 @@ start:
 
     c memtest
 
+    @:
+    nop
+    j @p
+
 //u64 memtest();
 memtest:
     ldi 0,x0

@@ -28,7 +28,7 @@ sudo ./bin/vcore -m 1048576 -c 1 -b ./boot/boot.bin
 
 vcore命令用法：
 
-```raw
+```bash
 -m    指定内存大小
 -c    指定vrisc核心数量
 -b    指定boot程序文件
