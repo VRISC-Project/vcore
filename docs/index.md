@@ -17,3 +17,7 @@ vrisc是极简的、可扩展的64位虚拟处理器架构。
 ## io
 
 见[vrisc io](io.md)
+
+## vas汇编
+
+见[vrisc assembly](vas.md)
