@@ -3,8 +3,6 @@
 
 ivt:
     j start
-    .b 0
-    .d 0
     .q ir_not_effective_address
     .q ir_devices
     .q ir_clock
@@ -73,7 +71,7 @@ ir_instruction_not_recognized:
 ir_permission_denied:
     @:
     nop
-    j @
+    j @p
 
 ir_io_port_invalid:
     ei
