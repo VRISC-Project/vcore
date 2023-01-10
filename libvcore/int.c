@@ -30,7 +30,7 @@
 intctl_shm *link_int()
 {
   // 打开共享内存fd
-  u32 intctlf = shm_open(INTCTL_NAMESTR, O_CREAT | O_TRUNC | O_RDWR, 0777);
+  u32 intctlf = shm_open(INTCTL_NAMESTR, O_TRUNC | O_RDWR, 0777);
   if (intctlf == -1)
   {
     printf("Shared memory allocation failed.\n");
