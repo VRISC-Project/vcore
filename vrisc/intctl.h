@@ -29,7 +29,9 @@ typedef struct intctl_shm
   u16 head, tail;
 } intctl_shm;
 
+#ifndef __int_h__
 /* 中断控制线程 */
 void *interrupt_global_controller(void *);
+#endif
 
 #endif

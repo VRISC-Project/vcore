@@ -23,8 +23,8 @@
 
 #if defined(__linux__)
 #include <unistd.h>
-#include <sys/time.h>
 #include <dlfcn.h>
+#include <sys/time.h>
 #elif defined(_WIN32)
 #include <windows.h>
 #endif

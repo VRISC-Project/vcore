@@ -39,6 +39,8 @@ typedef struct ioctl_shm
 extern ioctl_shm *io;
 #endif
 
+#ifndef __io_h__
 void *io_global_controller(void *);
+#endif
 
 #endif
