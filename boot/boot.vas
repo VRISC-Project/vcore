@@ -1,5 +1,5 @@
 .start 0x0
-.align 8
+.align 0x8
 
 ivt:
     j start
@@ -13,6 +13,7 @@ ivt:
 
 start:
     //设置中断向量表
+    ldi 0,x0
     livt x0
     ei
 

@@ -1,0 +1,15 @@
+10a		@0
+116		@1
+129		@2
+168		@3
+0		@4
+130		hit_nea
+158		ir_clock
+150		ir_devices
+160		ir_instruction_not_recognized
+170		ir_io_port_invalid
+138		ir_not_effective_address
+168		ir_permission_denied
+0		ivt
+110		memtest
+100		start
