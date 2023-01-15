@@ -35,6 +35,7 @@ enum err_code
     invalid_align_val = -8,
     invalid_start_val = -9,
     undefined_symbolic = -10,
+    symbolic_redefined = -11,
 };
 
 struct cmd_options
@@ -591,7 +592,7 @@ void generate()
                     }
                 }
                 else
-                { // TODO
+                {
                     v.erase(v.begin());
                     instructions[instcode[v[1]]](v, symbolic_table, special_symcnt, outfile);
                     glb_ip += time * len[instcode[v[1]]](v, symbolic_table, special_symcnt);
@@ -603,7 +604,7 @@ void generate()
             }
         }
         else
-        { // TODO
+        {
             instructions[instcode[v[0]]](v, symbolic_table, special_symcnt, outfile);
             glb_ip += len[instcode[v[0]]](v, symbolic_table, special_symcnt);
         }
@@ -741,6 +742,13 @@ void build_symblic_table()
             {
                 if (v[0][0] != '@')
                 {
+                    if (symbolic_table.find(v[0]) != symbolic_table.end())
+                    {
+                        std::cerr
+                            << "error: " << cmd_opt.infile << ": " << linenum << ": "
+                            << "Symbolic redefined: " << v[0] << std::endl;
+                        exit(err_code::symbolic_redefined);
+                    }
                     symbolic_table[v[0]] = ip;
                 }
                 else
