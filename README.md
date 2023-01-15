@@ -10,17 +10,25 @@
 
 ### 构建
 
-* 终端使用
+* vcore虚拟机
 
 ```bash
 mkdir build
 cd build
 cmake ../CMakeLists.txt
-make
+make vcore
 cd ..
 ```
 
+* vas汇编器
+
+```bash
+make vas
+```
+
 ### 运行
+
+* vcore虚拟机
 
 ```bash
 sudo ./bin/vcore -m 1048576 -c 1 -b ./boot/boot.bin
@@ -34,6 +42,14 @@ vcore命令用法：
 -b    指定boot程序文件
 -t    使用外部时钟；不使用此选项则使用内部的默认时钟，频率约为500Hz
 ```
+
+* vas汇编器
+
+```bash
+./bin/vas -i 源文件 -o 目标文件 -m map文件（可选） 
+```
+
+> map文件：导出源文件中的符号在目标文件中的地址。
 
 ## 内部计时器
 
