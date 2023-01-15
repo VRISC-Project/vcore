@@ -659,6 +659,14 @@ u64 in(u8 *inst, _core *core)
       return 0;
     }
   }
+  while (io->output_tails[src] == io->output_heads[src])
+  {
+#if defined(__linux__)
+    usleep(100);
+#elif defined(_WIN32)
+    Sleep(1);
+#endif
+  }
   u8_lock_lock(io->input_locks[src]);
   core->regs.x[tar] = io->input[src][io->input_heads[src]];
   io->input_heads[src]++;

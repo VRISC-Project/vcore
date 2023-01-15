@@ -57,12 +57,16 @@ io_global_controller(void *args)
 #elif defined(_WIN32)
     Sleep(10);
 #endif
-    //扫描1端口是否写入
+    // 1端口是否写入
     if (ctl->output_heads[1] == ctl->output_tails[1])
     {
       continue;
     }
     u8 open_core = ctl->output[1][ctl->output_heads[1]];
+    if (open_core >= cmd_options.core)
+    {
+      continue;
+    }
     u8_lock_lock(ctl->output_locks[1]);
     ctl->output_heads[1]++;
     u8_lock_unlock(ctl->output_locks[1]);
