@@ -742,13 +742,13 @@ void build_symblic_table()
             {
                 if (v[0][0] != '@')
                 {
-                    if (symbolic_table.find(v[0]) != symbolic_table.end())
-                    {
-                        std::cerr
-                            << "error: " << cmd_opt.infile << ": " << linenum << ": "
-                            << "Symbolic redefined: " << v[0] << std::endl;
-                        exit(err_code::symbolic_redefined);
-                    }
+                    // if (symbolic_table.find(v[0]) != symbolic_table.end())
+                    // {
+                    //     std::cerr
+                    //         << "error: " << cmd_opt.infile << ": " << linenum << ": "
+                    //         << "Symbolic redefined: " << v[0] << std::endl;
+                    //     exit(err_code::symbolic_redefined);
+                    // }
                     symbolic_table[v[0]] = ip;
                 }
                 else
