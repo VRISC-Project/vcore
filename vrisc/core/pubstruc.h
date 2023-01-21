@@ -21,6 +21,7 @@ struct options
   char *bootloader;         // 启动代码文件
   char *extinsts;           // 扩展指令集路径
   u8 shield_internal_clock; // 是否屏蔽内部时钟
+  u8 debug;                 // 调试模式
 };
 
 typedef struct core
@@ -110,6 +111,20 @@ typedef struct core
 
   /* 上一个指令的长度 */
   u64 incr;
+
+  /*
+  debug管理
+   */
+  struct debugging
+  {
+    u32 trap;
+    u8 continuing;
+
+    /* 断点，最多设置64个断点 */
+#define MAX_BP_COUNT 64
+    u64 breakpoints[MAX_BP_COUNT];
+    u8 bpcount; // 断点数量
+  } debug;
 
 } _core;
 

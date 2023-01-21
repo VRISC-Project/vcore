@@ -25,7 +25,7 @@ void make_vrisc_device()
   FILE *vrisc_device = fopen("/dev/vrisc", "r");
   if (vrisc_device)
   {
-    printf("A vrisc vCPU is running, waiting...");
+    printf("A vrisc vCPU is running, waiting...\n");
     while (vrisc_device = fopen("/dev/vrisc", "r"))
     { // 等待直到没有此文件存在
       // 休眠0.1s

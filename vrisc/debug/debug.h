@@ -11,6 +11,8 @@
 #ifndef __debug_hh__
 #define __debug_hh__
 
+
+
 char *debug(const char *command);
 
 #endif

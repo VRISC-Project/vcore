@@ -434,6 +434,35 @@ flash_ipbuff(_core *core, u64 *ipbuff)
   }
 }
 
+static void
+debugging(_core *core)
+{
+  if (core->debug.continuing && core->debug.trap)
+  {
+    if (core->debug.trap)
+    {
+      core->debug.trap--;
+    }
+    return;
+  }
+  while (!core->debug.continuing)
+  {
+#if defined(__linux__)
+    usleep(1000);
+#elif defined(_WIN32)
+    Sleep(1);
+#endif
+  }
+  while (!core->debug.trap)
+  {
+#if defined(__linux__)
+    usleep(1000);
+#elif defined(_WIN32)
+    Sleep(1);
+#endif
+  }
+}
+
 void *
 vrisc_core(void *id)
 {
@@ -444,6 +473,7 @@ vrisc_core(void *id)
     printf("Failed to create core#%d.\n", (u64)id);
     return (void *)CORE_FAILED;
   }
+
   cores[cid] = core; // 注册核心
   memset((void *)core, 0, sizeof(_core));
   core->id = cid;
@@ -482,6 +512,12 @@ vrisc_core(void *id)
         !core->interrupt.triggered)
     { // 可以处理下一个中断
       local_interrupt_controlling(core);
+    }
+
+    // debug
+    if (cmd_options.debug)
+    {
+      debugging(core);
     }
 
     if (!*(memory + ipbuff))

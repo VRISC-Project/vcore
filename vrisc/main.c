@@ -53,8 +53,9 @@ int main(int argc, char **argv)
 {
   deal_with_cmdline(argc, argv);
 
-  //设置终端发送的signal处理函数
+  // 设置终端发送的signal处理函数
   signal(SIGINT, terminal_sigint);
+  signal(SIGSEGV, terminal_sigint);
 
   create_memory(cmd_options.mem_size);
 
@@ -66,7 +67,11 @@ int main(int argc, char **argv)
 
   make_vrisc_device();
 
-  pthread_t cons = (pthread_t)console(0);
+  pthread_t cons;
+  if (cmd_options.debug)
+  {
+    cons = (pthread_t)console(0);
+  }
 
   pthread_t intctl, ioctl;
   pthread_create(&intctl, NULL, interrupt_global_controller, NULL);
@@ -74,8 +79,11 @@ int main(int argc, char **argv)
 
   join_cores();
   pthread_join(intctl, NULL);
-
-  pthread_join(cons, NULL);
+  pthread_join(ioctl, NULL);
+  if (cmd_options.debug)
+  {
+    pthread_join(cons, NULL);
+  }
 
   remove_vrisc_device();
 }
@@ -83,7 +91,10 @@ int main(int argc, char **argv)
 void terminal_sigint(i32 i)
 {
   remove_vrisc_device();
-  printf("\b\bvrisc terminated.\n");
+  if (i == SIGINT)
+    printf("\b\bvrisc terminated.\n");
+  else if (i == SIGSEGV)
+    printf("\b\bvrisc internal error.\n");
   exit(0);
 }
 
@@ -125,7 +136,9 @@ console(void *thr)
       }
       cmd[cnt++] = ch;
     }
-    printf(debug(cmd));
+    char *result = debug(cmd);
+    printf(result);
+    free(result);
   }
 }
 
@@ -160,7 +173,11 @@ void load_bootloader()
 void create_cores()
 {
   core_start_flags = malloc(cmd_options.core * sizeof(u8));
-  core_start_flags[0] = 1; // 首先开启核心0
+
+  if (!cmd_options.debug)
+  {
+    core_start_flags[0] = 1; // 首先开启核心0
+  }
 
   cores = malloc(cmd_options.core * sizeof(_core *));
 
@@ -181,8 +198,9 @@ void deal_with_cmdline(int argc, char **argv)
   cmd_options.core = 0;
   cmd_options.extinsts = NULL;
   cmd_options.mem_size = 0;
+  cmd_options.debug = 0;
   int opt;
-  while ((opt = getopt(argc, argv, "m:c:b:e:t")) != -1)
+  while ((opt = getopt(argc, argv, "m:c:b:e:td")) != -1)
   {
     switch (opt)
     {
@@ -209,6 +227,10 @@ void deal_with_cmdline(int argc, char **argv)
 
     case 't': // 屏蔽内部时钟
       cmd_options.shield_internal_clock = 1;
+      break;
+
+    case 'd': // 调试模式
+      cmd_options.debug = 1;
       break;
 
     default:
