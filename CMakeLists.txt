@@ -6,4 +6,3 @@ set(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib/)
 
 add_subdirectory(vrisc)
 add_subdirectory(libvcore)
-add_subdirectory(vas)
