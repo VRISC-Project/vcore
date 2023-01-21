@@ -19,12 +19,20 @@ start:
 
     c memtest
 
+    c inststest
+
     @:
     nop
     j @p
 
+inststest:
+
+    r
+
 //u64 memtest();
 memtest:
+    mv x0,x15
+
     ldi 0,x0
     ldi 1,x2
     @:
@@ -42,6 +50,8 @@ memtest:
         j @p
     @:
 
+    mv x0,x1
+    mv x15,x0
     r
 
 hit_nea:    //出现nea后为1
