@@ -6,8 +6,6 @@ vrisc虚拟处理器架构的实现。
 
 ### 构建
 
-* vcore虚拟机
-
 ```bash
 mkdir build
 cd build
@@ -16,15 +14,7 @@ make vcore
 cd ..
 ```
 
-* vas汇编器
-
-```bash
-make vas
-```
-
 ### 运行
-
-* vcore虚拟机
 
 ```bash
 sudo ./bin/vcore -m 1048576 -c 1 -b ./boot/boot.bin
@@ -39,14 +29,6 @@ vcore命令用法：
 -t    使用外部时钟；不使用此选项则使用内部的默认时钟，频率约为500Hz
 -d    开启debugger
 ```
-
-* vas汇编器
-
-```bash
-./bin/vas -i 源文件 -o 目标文件 -m map文件（可选） 
-```
-
-> map文件：导出源文件中的符号在目标文件中的地址。
 
 ## debugger
 
@@ -79,5 +61,11 @@ vcore命令用法：
 
 ## 开发事项
 
-* 汇编器还需要重新开发，这个只是临时使用。
 * debugger
+
+## English edition
+
+See [README.en.md](README.en.md).
+
+This edition might not be always the newest, the newest
+edition is this text.
