@@ -1,10 +1,6 @@
-# vrisc
+# vcore
 
-极简的、可扩展的虚拟处理器架构。
-
-* vcore是vrisc的一个实现
-
-## vrisc架构详情见[文档](docs/index.md)
+vrisc虚拟处理器架构的实现。
 
 ## 使用
 
@@ -41,6 +37,7 @@ vcore命令用法：
 -c    指定vrisc核心数量
 -b    指定boot程序文件
 -t    使用外部时钟；不使用此选项则使用内部的默认时钟，频率约为500Hz
+-d    开启debugger
 ```
 
 * vas汇编器
@@ -78,7 +75,7 @@ vcore命令用法：
 
 ## 设备抽象
 
-提供了设备`/dev/vriscx`，使用协议库访问设备。
+提供了设备`/dev/vrisc`，使用协议库`libvcore-ioint.so`访问设备。
 
 ## 开发事项
 
