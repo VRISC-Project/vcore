@@ -13,7 +13,7 @@
 #include "../types.h"
 
 #include "../device_control.h"
-#include "../tools/atou64.h"
+#include "../tools/tools.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -45,6 +45,7 @@ char *db_cont(char **arg);
 char *db_start(char **arg);
 
 // 命令处理函数表
+// 这些函数返回的字符串在堆内存，用完后需要立即free
 char *(*cmdhand[])(char **) = {
     db_core_help,
     db_core,
@@ -185,8 +186,10 @@ char *db_lbp(char **arg)
   TEST_IF_HAVE_DEBUGGING_CORE();
   for (u32 i = 0; i < cores[debugging_core]->debug.bpcount; i++)
   {
-    printf("%16x\n", (void *)(cores[debugging_core]->debug.breakpoints[i]));
-  } // TODO 地址显示有些问题
+    char *numstr = u64toaddr(cores[debugging_core]->debug.breakpoints[i]);
+    printf("0x%s\n", numstr);
+    free(numstr);
+  }
   char *res = malloc(1);
   res[0] = '\0';
   return res;
