@@ -20,7 +20,7 @@ cd ..
 sudo ./bin/vcore -m 1048576 -c 1 -b ./boot/boot.bin
 ```
 
-vcore命令用法：
+vcore useage：
 
 ```bash
 -m    Set memory size.
