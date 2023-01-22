@@ -65,6 +65,12 @@ debug(const char *command)
   char *cmd[8];
   memset(cmd, 0, 8 * sizeof(char *));
   u32 count = split_str((char *)command, cmd, ' ');
+  if (!cmd[0])
+  {
+    char *res = malloc(1);
+    res[0] = '\0';
+    return res;
+  }
   for (u32 i = 0; i < sizeof(commands) / sizeof(char *); i++)
   {
     if (!strcmp(cmd[0], commands[i]))
@@ -72,16 +78,53 @@ debug(const char *command)
       return cmdhand[i](cmd);
     }
   }
+  char *res = malloc(26);
+  sprintf(res, "Not an invalid command.\n");
+  return res;
 }
 
 char *db_core_help(char **arg)
 {
-  char *res = malloc(256);
-  sprintf(res,
-          "Totally %u cores.\n"
-          "Core#%d is on debugging.\n"
-          "(\'Core#-1\' means no core is on debugging.)\n",
-          cmd_options.core, debugging_core);
+  printf("Totally %d cores.\n", cmd_options.core);
+  if (debugging_core == -1)
+  {
+    printf("No core is on debugging.\n");
+  }
+  else
+  {
+    printf("Core#%d is on debugging.\n", debugging_core);
+  }
+  if (arg[1] && !strcmp(arg[1], "a"))
+  {
+    for (u32 i = 0; i < cmd_options.core; i++)
+    {
+      if (i != debugging_core)
+      {
+        printf("Core#%d\n", i);
+      }
+      else
+      {
+        printf("Core#%d (On debugging)\n", i);
+      }
+      if (core_start_flags[i])
+      {
+        if (cores[i]->debug.debugging)
+        {
+          printf("Waiting for debugging.\n");
+        }
+        else
+        {
+          printf("Running.\n");
+        }
+      }
+      else
+      {
+        printf("Not running.\n");
+      }
+    }
+  }
+  char *res = malloc(1);
+  res[0] = '\0';
   return res;
 }
 
@@ -198,16 +241,42 @@ char *db_lbp(char **arg)
 char *db_stp(char **arg)
 {
   TEST_IF_HAVE_DEBUGGING_CORE();
+  if (!arg[1])
+  {
+    cores[debugging_core]->debug.trap = 1;
+  }
+  else
+  {
+    u64 stp = atou64(arg[1]);
+    if (stp == 0 && !strcmp(arg[1], "0"))
+    {
+      char *res = malloc(25);
+      sprintf(res, "Argument not a number.\n");
+      return res;
+    }
+    cores[debugging_core]->debug.trap = stp;
+  }
+  char *res = malloc(1);
+  res[0] = '\0';
+  return res;
 }
 
 char *db_cont(char **arg)
 {
   TEST_IF_HAVE_DEBUGGING_CORE();
+  cores[debugging_core]->debug.continuing = 1;
+  char *res = malloc(1);
+  res[0] = '\0';
+  return res;
 }
 
 char *db_start(char **arg)
 {
   TEST_IF_HAVE_DEBUGGING_CORE();
+  core_start_flags[debugging_core] = 1;
+  char *res = malloc(1);
+  res[0] = '\0';
+  return res;
 }
 
 u32 split_str(char *__str, char **tar, char spc)

@@ -230,6 +230,17 @@ clock_producer(void *args)
   last_time = get_us_time();
   while (core_start_flags[cid])
   {
+    if (core->debug.debugging)
+    {
+      while (!core->debug.continuing || !core->debug.trap)
+      {
+#if defined(__linux__)
+        usleep(1000);
+#elif defined(_WIN32)
+        Sleep(1);
+#endif
+      }
+    }
 #if defined(__linux__)
     current_time = get_us_time();
     i64 slp_time = CLOCK_TICK - (current_time - last_time);
@@ -437,7 +448,19 @@ flash_ipbuff(_core *core, u64 *ipbuff)
 static void
 debugging(_core *core)
 {
-  if (core->debug.continuing && core->debug.trap)
+  for (u32 i = 0; i < core->debug.bpcount; i++)
+  {
+    if (core->debug.breakpoints[i] == core->regs.ip)
+    {
+      core->debug.continuing = 0;
+      break;
+    }
+  }
+  if (core->debug.continuing)
+  {
+    return;
+  }
+  if (core->debug.trap && core->debug.continuing)
   {
     if (core->debug.trap)
     {
@@ -445,7 +468,12 @@ debugging(_core *core)
     }
     return;
   }
-  while (!core->debug.continuing)
+  if (!core->debug.continuing)
+  {
+    if (!core->debug.trap)
+      core->debug.debugging = 1;
+  }
+  while (!core->debug.continuing || !core->debug.trap)
   {
 #if defined(__linux__)
     usleep(1000);
@@ -453,20 +481,15 @@ debugging(_core *core)
     Sleep(1);
 #endif
   }
-  while (!core->debug.trap)
-  {
-#if defined(__linux__)
-    usleep(1000);
-#elif defined(_WIN32)
-    Sleep(1);
-#endif
-  }
+  core->debug.debugging = 0;
 }
 
 void *
 vrisc_core(void *id)
 {
   u64 cid = (u64)id;
+  // _core coreobj;
+  // _core *core = &coreobj;
   _core *core = malloc(sizeof(_core)); // 构造核心
   if (!core)
   {
@@ -498,6 +521,8 @@ vrisc_core(void *id)
   }
 
   u64 ipbuff; // 此变量说明见 _core::ipbuff_need_flush
+
+  core->debug.continuing = 1;
 
   while (core_start_flags[cid])
   {

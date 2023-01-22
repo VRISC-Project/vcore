@@ -38,14 +38,14 @@ Debugger's command:
 
 command|explanation
 :-:|:-
-`core?`         |查询核心数量
-`core <id>`     |设置debug的核心号
-`bp <addr>`     |设置断点，虚拟机运行到物理地址`addr`处暂停
-`rbp <addr>`    |移除断点，若`addr`为断点，则移除，不是则不变
-`lbp`           |列出断点
-`stp <steps>`   |继续运行`steps`个指令，没有参数默认steps=1
-`cont`          |继续运行直到遇到断点
-`start`         |使当前调试的cpu开启
+`core?`         |To ask number of cores.(See running information with additional parameter `a`.)
+`core <id>`     |Set the core id you want to debug.
+`bp <addr>`     |Set physical address breakpoint.(Every hit to this `addr` will stop vcore.)
+`rbp <addr>`    |Remove breakpoint when `addr` is a breakpoint.
+`lbp`           |List all breakpoints.
+`stp <steps>`   |Run next `steps` instructions, and run one without `steps` parameter.
+`cont`          |Continue until hit a breakpoint.
+`start`         |start current cpu.
 
 ## Internal clock
 

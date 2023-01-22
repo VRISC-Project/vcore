@@ -28,78 +28,14 @@ eff_bits(u64 num)
 
 char *u64toa2(u64 num)
 {
-  u8 effb = eff_bits(num);
-  char *str = malloc(effb + 1);
-  str[effb] = '\0';
-  while (num)
-  {
-    for (u32 i = 0; i < effb; i++)
-    {
-      str[i] = str[i + 1];
-    }
-    str[effb - 1] = num & 1 ? '1' : '0';
-    num >>= 1;
-  }
-  return str;
 }
 
 char *u64toa8(u64 num)
 {
-  u8 effb = eff_bits(num);
-  effb = effb / 3 + ((effb % 3) ? 1 : 0);
-  char *str = malloc(effb + 1);
-  str[effb] = '\0';
-  while (num)
-  {
-    for (u32 i = 0; i < effb; i++)
-    {
-      str[i] = str[i + 1];
-    }
-    str[effb - 1] = (num & 7) + '0';
-    num >>= 3;
-  }
-  return str;
 }
 
 char *u64toa10(u64 num)
 {
-  char *str = malloc(21);
-  memset(str, 0, 21);
-  while (num)
-  {
-    for (u32 i = 0; i < 20; i++)
-    {
-      str[i] = str[i + 1];
-    }
-    str[19] = num % 10 + '0';
-    num /= 10;
-  }
-  while (!str[0])
-  {
-    for (u32 i = 0; i < 20; i++)
-    {
-      str[i] = str[i + 1];
-    }
-  }
-  return str;
-}
-
-char *u64toa16(u64 num)
-{
-  u8 effb = eff_bits(num);
-  effb = effb / 4 + ((effb % 4) ? 1 : 0);
-  char *str = malloc(effb + 1);
-  str[effb] = '\0';
-  while (num)
-  {
-    for (u32 i = 0; i < effb; i++)
-    {
-      str[i] = str[i + 1];
-    }
-    str[effb - 1] = (num & 15) + '0';
-    num >>= 4;
-  }
-  return str;
 }
 
 u8 uto16ch[] = {
@@ -121,18 +57,18 @@ u8 uto16ch[] = {
     'f',
 };
 
+char *u64toa16(u64 num)
+{
+}
+
 char *u64toaddr(u64 num)
 {
   char *str = malloc(17);
   memset(str, '0', 17);
   str[16] = '\0';
-  while (num)
+  for (u32 i = 0; num; i++)
   {
-    for (u32 i = 0; i < 16; i++)
-    {
-      str[i] = str[i + 1];
-    }
-    str[15] = uto16ch[num % 16];
+    str[15 - i] = uto16ch[num & 15];
     num >>= 4;
   }
   return str;

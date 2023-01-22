@@ -124,6 +124,8 @@ typedef struct core
 #define MAX_BP_COUNT 64
     u64 breakpoints[MAX_BP_COUNT];
     u8 bpcount; // 断点数量
+
+    u8 debugging; // core正在sleep，等待debug
   } debug;
 
 } _core;
