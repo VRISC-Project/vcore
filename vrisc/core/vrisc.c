@@ -453,35 +453,49 @@ debugging(_core *core)
     if (core->debug.breakpoints[i] == core->regs.ip)
     {
       core->debug.continuing = 0;
+      core->debug.contflg = 0;
+      core->debug.trapflg = 0;
       break;
     }
   }
-  if (core->debug.continuing)
-  {
-    return;
-  }
-  if (core->debug.trap && core->debug.continuing)
+  if (core->debug.trapflg)
   {
     if (core->debug.trap)
     {
       core->debug.trap--;
+      return;
     }
+    core->debug.debugging = 1;
+    while (!core->debug.continuing && !core->debug.trap)
+    {
+#if defined(__linux__)
+      usleep(1000);
+#elif defined(_WIN32)
+      Sleep(1);
+#endif
+    }
+    core->debug.debugging = 0;
+    core->debug.trapflg = 0;
     return;
   }
-  if (!core->debug.continuing)
+  if (core->debug.contflg)
   {
-    if (!core->debug.trap)
-      core->debug.debugging = 1;
-  }
-  while (!core->debug.continuing || !core->debug.trap)
-  {
+    if (core->debug.continuing)
+    {
+      return;
+    }
+    core->debug.debugging = 1;
+    while (!core->debug.continuing && !core->debug.trap)
+    {
 #if defined(__linux__)
-    usleep(1000);
+      usleep(1000);
 #elif defined(_WIN32)
-    Sleep(1);
+      Sleep(1);
 #endif
+    }
+    core->debug.debugging = 0;
+    core->debug.contflg = 0;
   }
-  core->debug.debugging = 0;
 }
 
 void *

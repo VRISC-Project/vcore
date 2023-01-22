@@ -29,6 +29,8 @@ char *commands[] = {
     "stp",   // 步进执行
     "cont",  // 继续运行
     "start", // 开启当前CPU
+    "mem",   // 显示内存内容
+    "reg",   // 显示寄存器内容
 };
 
 // 最多分8个
@@ -43,6 +45,8 @@ char *db_lbp(char **arg);
 char *db_stp(char **arg);
 char *db_cont(char **arg);
 char *db_start(char **arg);
+char *db_mem(char **arg);
+char *db_reg(char **arg);
 
 // 命令处理函数表
 // 这些函数返回的字符串在堆内存，用完后需要立即free
@@ -55,6 +59,8 @@ char *(*cmdhand[])(char **) = {
     db_stp,
     db_cont,
     db_start,
+    db_mem,
+    db_reg,
 };
 
 i64 debugging_core = -1;
@@ -130,11 +136,17 @@ char *db_core_help(char **arg)
 
 char *db_core(char **arg)
 {
+  if (!arg[1])
+  {
+    char *res = malloc(18);
+    sprintf(res, "Need a core id.\n");
+    return res;
+  }
   debugging_core = atoi(arg[1]);
   if (debugging_core >= cmd_options.core)
   {
-    char *res = malloc(26);
-    sprintf(res, "Not an invalid core id.\n");
+    char *res = malloc(22);
+    sprintf(res, "An invalid core id.\n");
     return res;
   }
   char *res = malloc(1);
@@ -256,6 +268,8 @@ char *db_stp(char **arg)
     }
     cores[debugging_core]->debug.trap = stp;
   }
+  cores[debugging_core]->debug.contflg = 0;
+  cores[debugging_core]->debug.trapflg = 1;
   char *res = malloc(1);
   res[0] = '\0';
   return res;
@@ -265,6 +279,8 @@ char *db_cont(char **arg)
 {
   TEST_IF_HAVE_DEBUGGING_CORE();
   cores[debugging_core]->debug.continuing = 1;
+  cores[debugging_core]->debug.contflg = 1;
+  cores[debugging_core]->debug.trapflg = 0;
   char *res = malloc(1);
   res[0] = '\0';
   return res;
@@ -274,6 +290,135 @@ char *db_start(char **arg)
 {
   TEST_IF_HAVE_DEBUGGING_CORE();
   core_start_flags[debugging_core] = 1;
+  char *res = malloc(1);
+  res[0] = '\0';
+  return res;
+}
+
+char *db_mem(char **arg)
+{
+  if (!arg[1])
+  {
+    char *res = malloc(30);
+    sprintf(res, "Need at least one argument.\n");
+    return res;
+  }
+  if (!arg[2])
+  {
+    char *res = malloc(3);
+    sprintf(res,
+            "%2x\n", memory[atou64(arg[1])]);
+    return res;
+  }
+  u64 time = atou64(arg[2]);
+  u64 st = atou64(arg[1]);
+  for (u32 i = 0; i < time; i++)
+  {
+    printf("%2x ", memory[st + i]);
+  }
+  char *res = malloc(2);
+  res[0] = '\n';
+  res[1] = '\0';
+  return res;
+}
+
+char *db_reg(char **arg)
+{
+  TEST_IF_HAVE_DEBUGGING_CORE();
+  _core *core = cores[debugging_core];
+  if (!arg[1])
+  { // 只有一个参数
+    printf("Generic Registers:\n");
+    for (u32 i = 0; i < 16; i++)
+    {
+      char *num = u64toaddr(core->regs.x[i]);
+      if (i < 10)
+      {
+        printf("x%d:  0x%s\n", i, num);
+      }
+      else
+      {
+        printf("x%d: 0x%s\n", i, num);
+      }
+      free(num);
+    }
+    printf("Special Registers:\n");
+    char *num;
+    num = u64toaddr(core->regs.ip);
+    printf("ip:  0x%s\n", num);
+    free(num);
+    num = u64toaddr(core->regs.flg);
+    printf("flg: 0x%s\n", num);
+    free(num);
+    num = u64toaddr(core->regs.ivt);
+    printf("ivt: 0x%s\n", num);
+    free(num);
+    num = u64toaddr(core->regs.kpt);
+    printf("kpt: 0x%s\n", num);
+    free(num);
+    num = u64toaddr(core->regs.upt);
+    printf("upt: 0x%s\n", num);
+    free(num);
+    num = u64toaddr(core->regs.scp);
+    printf("scp: 0x%s\n", num);
+    free(num);
+  }
+  else
+  { // 有一个寄存器参数
+    if (arg[1][0] == 'x')
+    { // 通用寄存器
+      u8 xreg = atou64(arg[1] + 1);
+      char *num = u64toaddr(core->regs.x[xreg]);
+      if (xreg < 10)
+      {
+        printf("x%d:  %s\n", xreg, num);
+      }
+      else
+      {
+        printf("x%d: %s\n", xreg, num);
+      }
+      free(num);
+    }
+    else
+    {
+      if (!strcmp(arg[1], "ip"))
+      {
+        char *num = u64toaddr(core->regs.ip);
+        printf("ip:  %s\n", num);
+        free(num);
+      }
+      else if (!strcmp(arg[1], "flg"))
+      {
+        char *num = u64toaddr(core->regs.flg);
+        printf("flg: %s\n", num);
+        free(num);
+      }
+      else if (!strcmp(arg[1], "ivt"))
+      {
+        char *num = u64toaddr(core->regs.ivt);
+        printf("ivt: %s\n", num);
+        free(num);
+      }
+      else if (!strcmp(arg[1], "kpt"))
+      {
+        char *num = u64toaddr(core->regs.kpt);
+        printf("kpt: %s\n", num);
+        free(num);
+      }
+      else if (!strcmp(arg[1], "upt"))
+      {
+        char *num = u64toaddr(core->regs.upt);
+        printf("upt: %s\n", num);
+        free(num);
+      }
+      else if (!strcmp(arg[1], "scp"))
+      {
+        char *num = u64toaddr(core->regs.scp);
+        printf("scp: %s\n", num);
+        free(num);
+      }
+    }
+  }
   char *res = malloc(1);
   res[0] = '\0';
   return res;

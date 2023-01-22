@@ -36,14 +36,16 @@ vcore命令用法：
 
 命令|说明
 :-:|:-
-`core?`         |查询核心数量，加参数`a`可以查询每个核心的运行信息
-`core <id>`     |设置debug的核心号
-`bp <addr>`     |设置断点，虚拟机运行到物理地址`addr`处暂停
-`rbp <addr>`    |移除断点，若`addr`为断点，则移除，不是则不变
-`lbp`           |列出断点
-`stp <steps>`   |继续运行`steps`个指令，没有参数默认steps=1
-`cont`          |继续运行直到遇到断点
-`start`         |使当前调试的cpu开启
+`core?`                 |查询核心数量，加参数`a`可以查询每个核心的运行信息
+`core <id>`             |设置debug的核心号
+`bp <addr>`             |设置断点，虚拟机运行到物理地址`addr`处暂停
+`rbp <addr>`            |移除断点，若`addr`为断点，则移除，不是则不变
+`lbp`                   |列出断点
+`stp <steps>`           |继续运行`steps`个指令，没有参数默认steps=1
+`cont`                  |继续运行直到遇到断点
+`start`                 |使当前调试的cpu开启
+`mem <addr> <bytes>`    |查看`addr`地址处开始`bytes`字节的内存（16进制）
+`reg <name>`            |查看`name`寄存器名，没有参数则列出所有寄存器
 
 ## 内部计时器
 

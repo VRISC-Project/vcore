@@ -126,6 +126,11 @@ typedef struct core
     u8 bpcount; // 断点数量
 
     u8 debugging; // core正在sleep，等待debug
+
+    // 这两个的作用结合../core/vrisc.c
+    // debugging函数自行理解
+    u8 contflg;
+    u8 trapflg;
   } debug;
 
 } _core;
