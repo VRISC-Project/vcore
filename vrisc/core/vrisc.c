@@ -69,8 +69,8 @@ void init_core()
   instructions[14] = sysc;
   instructions[15] = sysr;
   instructions[16] = loop;
-  instructions[17] = chl;
-  instructions[18] = chr;
+  instructions[17] = shl;
+  instructions[18] = shr;
   instructions[19] = rol;
   instructions[20] = ror;
   instructions[21] = ldi;

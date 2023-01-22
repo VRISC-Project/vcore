@@ -430,7 +430,7 @@ u64 loop(u8 *inst, _core *core)
   }
 }
 
-u64 chl(u8 *inst, _core *core)
+u64 shl(u8 *inst, _core *core)
 {
   u8 tar = inst[1];
   u8 src = tar % 16;
@@ -440,7 +440,7 @@ u64 chl(u8 *inst, _core *core)
   return 2;
 }
 
-u64 chr(u8 *inst, _core *core)
+u64 shr(u8 *inst, _core *core)
 {
   u8 tar = inst[1];
   u8 src = tar % 16;
