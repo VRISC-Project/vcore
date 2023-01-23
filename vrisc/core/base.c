@@ -13,6 +13,7 @@
 
 #include <stdio.h>
 #include <unistd.h>
+#include <time.h>
 
 extern struct options cmd_options;
 
@@ -662,7 +663,7 @@ u64 in(u8 *inst, _core *core)
   while (io->output_tails[src] == io->output_heads[src])
   {
 #if defined(__linux__)
-    usleep(100);
+    nanosleep(&(struct timespec){0, 100000}, NULL);
 #elif defined(_WIN32)
     Sleep(1);
 #endif
@@ -694,7 +695,7 @@ u64 out(u8 *inst, _core *core)
   while (io->output_tails[tar] + 1 == io->output_heads[tar])
   {
 #if defined(__linux__)
-    usleep(100);
+    nanosleep(&(struct timespec){0, 100000}, NULL);
 #elif defined(_WIN32)
     Sleep(1);
 #endif
@@ -811,7 +812,7 @@ u64 cpuid(u8 *inst, _core *core)
   case 3:
     printf((const char *)core->regs.x[1]);
     break;
-  
+
   default:
     break;
   }

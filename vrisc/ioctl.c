@@ -20,6 +20,7 @@
 
 #if defined(__linux__)
 #include <unistd.h>
+#include <time.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -53,7 +54,7 @@ io_global_controller(void *args)
   while (core_start_flags[0])
   {
 #if defined(__linux__)
-    usleep(1000);
+    nanosleep(&(struct timespec){0, 1000000}, NULL);
 #elif defined(_WIN32)
     Sleep(10);
 #endif

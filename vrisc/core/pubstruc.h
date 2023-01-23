@@ -137,11 +137,11 @@ typedef struct core
 
 /* 锁操作 */
 #define u8_lock_unlock(lock) lock = 0;
-#define u8_lock_lock(lock) \
-  {                        \
-    while (lock)           \
-      usleep(50);          \
-    lock = 1;              \
+#define u8_lock_lock(lock)                           \
+  {                                                  \
+    while (lock)                                     \
+      nanosleep(&(struct timespec){0, 50000}, NULL); \
+    lock = 1;                                        \
   }
 
 #endif

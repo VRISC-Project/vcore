@@ -21,6 +21,7 @@
 
 #if defined(__linux__)
 #include <unistd.h>
+#include <time.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -62,7 +63,7 @@ interrupt_global_controller(void *args)
   while (core_start_flags[0])
   { // 只要判断core#0是否在运行即可，因为core#0一定第一个开启，最后关闭
 #if defined(__linux__)
-    usleep(700);
+    nanosleep(&(struct timespec){0,700000}, NULL);
 #elif defined(_WIN32)
     Sleep(1);
 #endif

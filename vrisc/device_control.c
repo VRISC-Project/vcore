@@ -15,6 +15,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <time.h>
 
 _core **cores;
 
@@ -29,7 +30,7 @@ void make_vrisc_device()
     while (vrisc_device = fopen("/dev/vrisc", "r"))
     { // 等待直到没有此文件存在
       // 休眠0.1s
-      usleep(100000);
+      nanosleep(&(struct timespec){0, 100000000}, NULL);
     }
   }
   vrisc_device = fopen("/dev/vrisc", "w");

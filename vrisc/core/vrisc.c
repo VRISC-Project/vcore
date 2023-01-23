@@ -235,7 +235,7 @@ clock_producer(void *args)
       while (!core->debug.continuing || !core->debug.trap)
       {
 #if defined(__linux__)
-        usleep(1000);
+        nanosleep(&(struct timespec){0, 100000}, NULL);
 #elif defined(_WIN32)
         Sleep(1);
 #endif
@@ -248,12 +248,17 @@ clock_producer(void *args)
     {
       slp_time = 0;
     }
-    while (slp_time)
+    struct timespec slp = {0, slp_time * 1000};
+    while (slp.tv_nsec)
     {
-      slp_time = usleep(slp_time);
+      if (!nanosleep(&slp, &slp))
+      {
+        slp.tv_sec = 0;
+        slp.tv_nsec = 0;
+      }
     }
 #elif defined(_WIN32)
-    Sleep(1);
+    Sleep(5);
 #endif
     intctl_addint(core, IR_CLOCK);
   }
@@ -346,7 +351,7 @@ void intctl_addint(_core *core, u8 intid)
   while (
       core->interrupt.controller.head ==
       core->interrupt.controller.tail + 1)
-    usleep(50); // 如果队列满了要等待
+    nanosleep(&(struct timespec){0, 50000}, NULL); // 如果队列满了要等待
   u8_lock_lock(core->interrupt.controller.lock);
   core->interrupt.controller.interrupt_queue[core->interrupt.controller.tail] = intid;
   core->interrupt.controller.tail++;
@@ -379,7 +384,7 @@ inst_nop(_core *core, u64 *ipbuff)
   {
     local_interrupt_controlling(core);
 #if defined(__linux__)
-    usleep(1000);
+    nanosleep(&(struct timespec){0, 1000000}, NULL);
 #elif defined(_WIN32)
     Sleep(1);
 #endif
@@ -469,7 +474,7 @@ debugging(_core *core)
     while (!core->debug.continuing && !core->debug.trap)
     {
 #if defined(__linux__)
-      usleep(1000);
+      nanosleep(&(struct timespec){0, 1000000}, NULL);
 #elif defined(_WIN32)
       Sleep(1);
 #endif
@@ -488,7 +493,7 @@ debugging(_core *core)
     while (!core->debug.continuing && !core->debug.trap)
     {
 #if defined(__linux__)
-      usleep(1000);
+      nanosleep(&(struct timespec){0, 1000000}, NULL);
 #elif defined(_WIN32)
       Sleep(1);
 #endif
@@ -521,7 +526,7 @@ vrisc_core(void *id)
   while (!core_start_flags[cid])
   {
 #if defined(__linux__)
-    usleep(500);
+    nanosleep(&(struct timespec){0, 500000}, NULL);
 #elif defined(_WIN32)
     Sleep(1);
 #endif
