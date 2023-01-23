@@ -46,6 +46,7 @@ vcore命令用法：
 `start`                 |使当前调试的cpu开启
 `mem <addr> <bytes>`    |查看`addr`地址处开始`bytes`字节的内存（16进制）
 `reg <name>`            |查看`name`寄存器名，没有参数则列出所有寄存器
+`stop`                  |结束核心
 
 ## 内部计时器
 

@@ -31,6 +31,7 @@ char *commands[] = {
     "start", // 开启当前CPU
     "mem",   // 显示内存内容
     "reg",   // 显示寄存器内容
+    "stop",  // 结束核心
 };
 
 // 最多分8个
@@ -47,6 +48,7 @@ char *db_cont(char **arg);
 char *db_start(char **arg);
 char *db_mem(char **arg);
 char *db_reg(char **arg);
+char *db_stop(char **arg);
 
 // 命令处理函数表
 // 这些函数返回的字符串在堆内存，用完后需要立即free
@@ -61,6 +63,7 @@ char *(*cmdhand[])(char **) = {
     db_start,
     db_mem,
     db_reg,
+    db_stop,
 };
 
 i64 debugging_core = -1;
@@ -419,6 +422,15 @@ char *db_reg(char **arg)
       }
     }
   }
+  char *res = malloc(1);
+  res[0] = '\0';
+  return res;
+}
+
+char *db_stop(char **arg)
+{
+  TEST_IF_HAVE_DEBUGGING_CORE();
+  core_start_flags[debugging_core] = 0;
   char *res = malloc(1);
   res[0] = '\0';
   return res;
