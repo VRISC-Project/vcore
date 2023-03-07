@@ -71,6 +71,12 @@ impl Vcore {
     }
 
     pub fn core(&mut self) {
+        while !self.started {
+            thread::sleep(Duration::from_millis(1));
+        }
+        while !self.terminated {
+            //
+        }
         //这是最后要做的
         self.terminated = false;
     }

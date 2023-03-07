@@ -1,7 +1,7 @@
 mod vrisc_core;
 
 use std::{
-    alloc::{alloc, Layout},
+    alloc::{alloc, Layout, dealloc},
     fs,
     io::Read,
     sync::{Arc, RwLock},
@@ -78,9 +78,10 @@ pub fn run(config: Config) {
     for core in cores.iter() {
         core.lock().unwrap().join();
     }
+    free_memory(memory.read().unwrap().0, config.memory);
 }
 
-pub fn load_firmware(firmware_file: String, mut memory: *mut u8) {
+fn load_firmware(firmware_file: String, mut memory: *mut u8) {
     let mut firmware;
     if let Ok(file) = fs::File::open(&firmware_file) {
         firmware = file;
@@ -100,7 +101,7 @@ pub fn load_firmware(firmware_file: String, mut memory: *mut u8) {
     }
 }
 
-pub fn init_memory(size: usize) -> *mut u8 {
+fn init_memory(size: usize) -> *mut u8 {
     let memory;
     unsafe {
         let mut v = Vec::new();
@@ -111,4 +112,12 @@ pub fn init_memory(size: usize) -> *mut u8 {
         }
     }
     memory
+}
+
+fn free_memory(memory: *mut u8, size: usize) {
+    unsafe {
+        let mut v = Vec::new();
+        v.resize(size, 0u8);
+        dealloc(memory, Layout::for_value(&v));
+    }
 }
