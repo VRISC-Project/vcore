@@ -64,7 +64,8 @@ vcore命令用法：
 
 ## 开发事项
 
-* debugger
+停止维护，正在用rust重构，目前正在重构的rust项目推送在本repo的`rust`分支中，
+重构完成后合并到`main`分支。
 
 ## English edition
 
