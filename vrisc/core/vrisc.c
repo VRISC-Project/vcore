@@ -216,7 +216,7 @@ get_us_time()
 {
   static struct timeval time;
   gettimeofday(&time, NULL);
-  return time.tv_sec * 1000 * 1000 + time.tv_usec;
+  return (time.tv_sec * 1000 + time.tv_usec) * 1000;
 }
 #endif
 
@@ -543,8 +543,13 @@ vrisc_core(void *id)
 
   core->debug.continuing = 1;
 
+  // u64 tot = 0;
+  // u64 ts = get_us_time();
+
   while (core_start_flags[cid])
   {
+    // tot++;
+
     if (core->ipbuff_need_flash)
     { // 刷新ipbuff
       flash_ipbuff(core, &ipbuff);
@@ -604,10 +609,16 @@ vrisc_core(void *id)
     ipbuff += core->incr;
   }
 
-  if (cmd_options.shield_internal_clock)
+  if (!cmd_options.shield_internal_clock)
   {
     pthread_join(clock_id, NULL);
   }
+
+  // u64 te = get_us_time();
+
+  // double hz = tot / (((double)te - ts) / 1000000);
+
+  // printf("\n%.2fHz\n", hz);
 
   free(core);
 }

@@ -379,7 +379,7 @@ volatile u64 ir(u8 *inst, _core *core)
   RPL_MODE_CHECK(core);
   u8 mod = inst[1];
   if (!mod)
-  {
+  { // panic模式
     core->regs.ip = 0;
     core->regs.flg = 0;
     return 0;
