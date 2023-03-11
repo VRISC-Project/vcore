@@ -1,4 +1,4 @@
-use vcore_rust::Config;
+use vcore_rust::config::Config;
 
 fn main() {
     println!(
