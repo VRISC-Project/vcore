@@ -1,4 +1,4 @@
-use vcore_rust::config::Config;
+use vcore::config::Config;
 
 fn main() {
     println!(
@@ -6,5 +6,5 @@ fn main() {
 (c)Copysight Random World Studio 2023. All rights served."
     );
     let config = Config::new();
-    vcore_rust::run(config);
+    vcore::run(config);
 }

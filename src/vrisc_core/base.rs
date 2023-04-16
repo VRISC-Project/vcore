@@ -1,6 +1,8 @@
-use crate::vrisc_core::Registers;
+use crate::vrisc_core::Vcore;
 
-pub const BASE: [Option<fn(&[u8], Registers) -> u64>; 64] = [
+use super::VcoreInstruction;
+
+pub const BASE: [Option<VcoreInstruction>; 64] = [
     Some(i_nop),
     Some(i_add),
     Some(i_sub),
@@ -74,110 +76,113 @@ pub const BASE: [Option<fn(&[u8], Registers) -> u64>; 64] = [
 /// 指令返回ip寄存器需要增加的长度
 // TODO
 
-pub fn i_nop(inst: &[u8], regs: Registers) -> u64 {
+pub fn i_nop(inst: &[u8], regs: &mut Vcore) -> u64 {
+    println!("nop");
     0
 }
-pub fn i_add(inst: &[u8], regs: Registers) -> u64 {
+pub fn i_add(inst: &[u8], regs: &mut Vcore) -> u64 {
     0
 }
-pub fn i_sub(inst: &[u8], regs: Registers) -> u64 {
+pub fn i_sub(inst: &[u8], regs: &mut Vcore) -> u64 {
     0
 }
-pub fn i_inc(inst: &[u8], regs: Registers) -> u64 {
+pub fn i_inc(inst: &[u8], regs: &mut Vcore) -> u64 {
     0
 }
-pub fn i_dec(inst: &[u8], regs: Registers) -> u64 {
+pub fn i_dec(inst: &[u8], regs: &mut Vcore) -> u64 {
     0
 }
-pub fn i_cmp(inst: &[u8], regs: Registers) -> u64 {
+pub fn i_cmp(inst: &[u8], regs: &mut Vcore) -> u64 {
     0
 }
-pub fn i_and(inst: &[u8], regs: Registers) -> u64 {
+pub fn i_and(inst: &[u8], regs: &mut Vcore) -> u64 {
     0
 }
-pub fn i_or(inst: &[u8], regs: Registers) -> u64 {
+pub fn i_or(inst: &[u8], regs: &mut Vcore) -> u64 {
     0
 }
-pub fn i_not(inst: &[u8], regs: Registers) -> u64 {
+pub fn i_not(inst: &[u8], regs: &mut Vcore) -> u64 {
     0
 }
-pub fn i_xor(inst: &[u8], regs: Registers) -> u64 {
+pub fn i_xor(inst: &[u8], regs: &mut Vcore) -> u64 {
     0
 }
-pub fn i_jc(inst: &[u8], regs: Registers) -> u64 {
+pub fn i_jc(inst: &[u8], regs: &mut Vcore) -> u64 {
     0
 }
-pub fn i_cc(inst: &[u8], regs: Registers) -> u64 {
+pub fn i_cc(inst: &[u8], regs: &mut Vcore) -> u64 {
     0
 }
-pub fn i_r(inst: &[u8], regs: Registers) -> u64 {
+pub fn i_r(inst: &[u8], regs: &mut Vcore) -> u64 {
     0
 }
-pub fn i_ir(inst: &[u8], regs: Registers) -> u64 {
+pub fn i_ir(inst: &[u8], regs: &mut Vcore) -> u64 {
     0
 }
-pub fn i_sysc(inst: &[u8], regs: Registers) -> u64 {
+pub fn i_sysc(inst: &[u8], regs: &mut Vcore) -> u64 {
     0
 }
-pub fn i_sysr(inst: &[u8], regs: Registers) -> u64 {
+pub fn i_sysr(inst: &[u8], regs: &mut Vcore) -> u64 {
     0
 }
-pub fn i_loop(inst: &[u8], regs: Registers) -> u64 {
+pub fn i_loop(inst: &[u8], regs: &mut Vcore) -> u64 {
     0
 }
-pub fn i_shl(inst: &[u8], regs: Registers) -> u64 {
+pub fn i_shl(inst: &[u8], regs: &mut Vcore) -> u64 {
     0
 }
-pub fn i_shr(inst: &[u8], regs: Registers) -> u64 {
+pub fn i_shr(inst: &[u8], regs: &mut Vcore) -> u64 {
     0
 }
-pub fn i_rol(inst: &[u8], regs: Registers) -> u64 {
+pub fn i_rol(inst: &[u8], regs: &mut Vcore) -> u64 {
     0
 }
-pub fn i_ror(inst: &[u8], regs: Registers) -> u64 {
+pub fn i_ror(inst: &[u8], regs: &mut Vcore) -> u64 {
     0
 }
-pub fn i_ldi(inst: &[u8], regs: Registers) -> u64 {
+pub fn i_ldi(inst: &[u8], regs: &mut Vcore) -> u64 {
     0
 }
-pub fn i_ldm(inst: &[u8], regs: Registers) -> u64 {
+pub fn i_ldm(inst: &[u8], regs: &mut Vcore) -> u64 {
     0
 }
-pub fn i_stm(inst: &[u8], regs: Registers) -> u64 {
+pub fn i_stm(inst: &[u8], regs: &mut Vcore) -> u64 {
     0
 }
-pub fn i_ei(inst: &[u8], regs: Registers) -> u64 {
+pub fn i_ei(inst: &[u8], regs: &mut Vcore) -> u64 {
     0
 }
-pub fn i_di(inst: &[u8], regs: Registers) -> u64 {
+pub fn i_di(inst: &[u8], regs: &mut Vcore) -> u64 {
     0
 }
-pub fn i_ep(inst: &[u8], regs: Registers) -> u64 {
+pub fn i_ep(inst: &[u8], regs: &mut Vcore) -> u64 {
     0
 }
-pub fn i_dp(inst: &[u8], regs: Registers) -> u64 {
+pub fn i_dp(inst: &[u8], regs: &mut Vcore) -> u64 {
     0
 }
-pub fn i_mv(inst: &[u8], regs: Registers) -> u64 {
+pub fn i_mv(inst: &[u8], regs: &mut Vcore) -> u64 {
     0
 }
-pub fn i_livt(inst: &[u8], regs: Registers) -> u64 {
+pub fn i_livt(inst: &[u8], regs: &mut Vcore) -> u64 {
     0
 }
-pub fn i_lkpt(inst: &[u8], regs: Registers) -> u64 {
+pub fn i_lkpt(inst: &[u8], regs: &mut Vcore) -> u64 {
     0
 }
-pub fn i_lupt(inst: &[u8], regs: Registers) -> u64 {
+pub fn i_lupt(inst: &[u8], regs: &mut Vcore) -> u64 {
     0
 }
 //这两个指令之间有32和33号指令保留
-pub fn i_in(inst: &[u8], regs: Registers) -> u64 {
+//34 initext
+//35 destext
+pub fn i_in(inst: &[u8], regs: &mut Vcore) -> u64 {
     0
 }
-pub fn i_out(inst: &[u8], regs: Registers) -> u64 {
+pub fn i_out(inst: &[u8], regs: &mut Vcore) -> u64 {
     0
 }
 //这两个指令之间有38~40号指令保留
-pub fn i_cpuid(inst: &[u8], regs: Registers) -> u64 {
+pub fn i_cpuid(inst: &[u8], regs: &mut Vcore) -> u64 {
     0
 }

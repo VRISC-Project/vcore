@@ -9,7 +9,7 @@ pub struct Config {
 impl Config {
     pub fn new() -> Config {
         let mut config = Config {
-            cores: 0,
+            cores: 1,
             memory: 0,
             firmware_file: String::from(""),
             debug: false,
@@ -45,7 +45,7 @@ impl Config {
                 }
                 "-d" => config.debug = true,
                 "-t" => config.clock = true,
-                &_ => panic!("Unknown option {}", arg),
+                _ => panic!("Unknown option {}", arg),
             }
         }
         config
