@@ -2,16 +2,22 @@ mod base;
 pub mod memory;
 
 use std::{
-    sync::{Arc, RwLock, mpsc::{self, Receiver}},
+    sync::{
+        mpsc::{self, Receiver},
+        RwLock,
+    },
     thread::{self, JoinHandle},
     time::Duration,
 };
+
+use crate::utils::vrc::Vrc;
 
 use self::memory::Memory;
 
 pub type VcoreInstruction = fn(&[u8], &mut Vcore) -> u64;
 
 ///# vrisc寄存器
+#[derive(Clone)]
 pub struct Registers {
     pub x: [u64; 16],
     pub ip: u64,
@@ -90,6 +96,8 @@ impl Registers {
     }
 }
 
+impl Copy for Registers {}
+
 ///# 中断控制器
 pub struct InterruptController {
     triggered: bool,
@@ -148,7 +156,7 @@ pub struct Vcore {
 impl Vcore {
     ///### 初始化一个虚拟机核心  
     /// 由于内存是在核心间共享的，需要外部传入
-    pub fn new(memory: Memory) -> Arc<RwLock<Vcore>> {
+    pub fn new(memory: Memory) -> Vrc<Vcore> {
         let mut core = Vcore {
             regs: Registers::new(),
             instructions: InstructionSpace::new(),
@@ -160,12 +168,13 @@ impl Vcore {
             terminated: false,
         };
         core.instructions.load_instruction_set(&base::BASE);
-        let core = Arc::new(RwLock::new(core));
-        let core_ret = Arc::clone(&core);
+        let mut core = Vrc::new(core);
+        let core_ret = Vrc::clone(&core);
         let (tx, rx) = mpsc::channel();
         let thr = Some(thread::spawn(move || {
-            core.write().unwrap().core(rx);
-        })).unwrap();
+            core.lock().unwrap().core(rx);
+        }))
+        .unwrap();
         tx.send(thr).unwrap();
         core_ret
     }
@@ -217,7 +226,9 @@ impl Vcore {
             let opcode = { self.memory.memory as u64 };
             let opcode = (opcode + addr) as *const u8;
             let opcode = unsafe { *opcode } as usize;
-            if let Some(instruction) = self.instructions.instruction(opcode.try_into().unwrap()) {
+            if let Some(instruction) = //
+                self.instructions.instruction(opcode.try_into().unwrap())
+            {
                 let code = &self.read_instruction(addr);
                 self.incr = instruction(code, self);
                 self.regs.ip += self.incr;
@@ -229,5 +240,23 @@ impl Vcore {
         }
         //这是最后要做的
         self.terminated = false;
+    }
+}
+
+impl Drop for Vcore {
+    /// 此处drop不执行任何操作
+    /// 只有特意调用vcore_drop()才能释放
+    /// 方便Vrc指针的操作
+    fn drop(&mut self) {}
+}
+
+impl Vcore {
+    fn vcore_drop(mut self) {
+        drop(self.incr);
+        drop(self.intctller.write().unwrap());
+        drop(self.regs);
+        drop(self.started);
+        drop(self.terminated);
+        drop(self.thr.take());
     }
 }

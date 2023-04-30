@@ -1,5 +1,6 @@
 pub mod config;
 pub mod vrisc_core;
+pub mod utils;
 
 use config::Config;
 use vrisc_core::{memory::Memory, Vcore};
@@ -13,9 +14,9 @@ pub fn run(config: Config) {
     }
     //默认开启CPU0
     {
-        cores[0].write().unwrap().start();
+        cores[0].lock().unwrap().start();
     }
-    for core in cores.iter() {
-        core.read().unwrap().join();
+    for core in cores.iter_mut() {
+        core.lock().unwrap().join();
     }
 }
