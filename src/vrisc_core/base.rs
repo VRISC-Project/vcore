@@ -1,7 +1,3 @@
-use crate::vrisc_core::Vcore;
-
-use super::VcoreInstruction;
-
 pub const BASE: [Option<VcoreInstruction>; 64] = [
     Some(i_nop),
     Some(i_add),
