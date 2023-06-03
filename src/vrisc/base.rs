@@ -1,3 +1,7 @@
+use super::vcore::Vcore;
+
+type VcoreInstruction = fn(&[u8], &mut Vcore) -> u64;
+
 pub const BASE: [Option<VcoreInstruction>; 64] = [
     Some(i_nop),
     Some(i_add),

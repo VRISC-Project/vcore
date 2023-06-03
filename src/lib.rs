@@ -1,10 +1,11 @@
 pub mod config;
 pub mod memory;
 pub mod utils;
+pub mod vrisc;
 
 use config::Config;
 use memory::Memory;
-use nix::unistd;
+use nix::unistd::{self};
 
 pub fn run(config: Config) {
     let mut cores = Vec::new();
