@@ -1,3 +1,5 @@
+use std::{thread, time::Duration};
+
 use super::vcore::Vcore;
 
 type VcoreInstruction = fn(&[u8], &mut Vcore) -> u64;
@@ -76,196 +78,202 @@ pub const BASE: [Option<VcoreInstruction>; 64] = [
 /// 指令返回ip寄存器需要增加的长度
 // TODO
 
-pub fn i_nop(inst: &[u8], regs: &mut Vcore) -> u64 {
+pub fn i_nop(inst: &[u8], core: &mut Vcore) -> u64 {
     println!("nop");
+    loop {
+        thread::sleep(Duration::from_millis(1));
+        if core.interrupted() {
+            break;
+        }
+    }
+    1
+}
+pub fn i_add(inst: &[u8], core: &mut Vcore) -> u64 {
     0
 }
-pub fn i_add(inst: &[u8], regs: &mut Vcore) -> u64 {
+pub fn i_sub(inst: &[u8], core: &mut Vcore) -> u64 {
     0
 }
-pub fn i_sub(inst: &[u8], regs: &mut Vcore) -> u64 {
+pub fn i_inc(inst: &[u8], core: &mut Vcore) -> u64 {
     0
 }
-pub fn i_inc(inst: &[u8], regs: &mut Vcore) -> u64 {
+pub fn i_dec(inst: &[u8], core: &mut Vcore) -> u64 {
     0
 }
-pub fn i_dec(inst: &[u8], regs: &mut Vcore) -> u64 {
+pub fn i_shl(inst: &[u8], core: &mut Vcore) -> u64 {
     0
 }
-pub fn i_shl(inst: &[u8], regs: &mut Vcore) -> u64 {
+pub fn i_shr(inst: &[u8], core: &mut Vcore) -> u64 {
     0
 }
-pub fn i_shr(inst: &[u8], regs: &mut Vcore) -> u64 {
+pub fn i_rol(inst: &[u8], core: &mut Vcore) -> u64 {
     0
 }
-pub fn i_rol(inst: &[u8], regs: &mut Vcore) -> u64 {
+pub fn i_ror(inst: &[u8], core: &mut Vcore) -> u64 {
     0
 }
-pub fn i_ror(inst: &[u8], regs: &mut Vcore) -> u64 {
+pub fn i_cmp(inst: &[u8], core: &mut Vcore) -> u64 {
     0
 }
-pub fn i_cmp(inst: &[u8], regs: &mut Vcore) -> u64 {
+pub fn i_and(inst: &[u8], core: &mut Vcore) -> u64 {
     0
 }
-pub fn i_and(inst: &[u8], regs: &mut Vcore) -> u64 {
+pub fn i_or(inst: &[u8], core: &mut Vcore) -> u64 {
     0
 }
-pub fn i_or(inst: &[u8], regs: &mut Vcore) -> u64 {
+pub fn i_not(inst: &[u8], core: &mut Vcore) -> u64 {
     0
 }
-pub fn i_not(inst: &[u8], regs: &mut Vcore) -> u64 {
+pub fn i_xor(inst: &[u8], core: &mut Vcore) -> u64 {
     0
 }
-pub fn i_xor(inst: &[u8], regs: &mut Vcore) -> u64 {
+pub fn i_0e(inst: &[u8], core: &mut Vcore) -> u64 {
     0
 }
-pub fn i_0e(inst: &[u8], regs: &mut Vcore) -> u64 {
+pub fn i_0f(inst: &[u8], core: &mut Vcore) -> u64 {
     0
 }
-pub fn i_0f(inst: &[u8], regs: &mut Vcore) -> u64 {
+pub fn i_10(inst: &[u8], core: &mut Vcore) -> u64 {
     0
 }
-pub fn i_10(inst: &[u8], regs: &mut Vcore) -> u64 {
+pub fn i_11(inst: &[u8], core: &mut Vcore) -> u64 {
     0
 }
-pub fn i_11(inst: &[u8], regs: &mut Vcore) -> u64 {
+pub fn i_12(inst: &[u8], core: &mut Vcore) -> u64 {
     0
 }
-pub fn i_12(inst: &[u8], regs: &mut Vcore) -> u64 {
+pub fn i_13(inst: &[u8], core: &mut Vcore) -> u64 {
     0
 }
-pub fn i_13(inst: &[u8], regs: &mut Vcore) -> u64 {
+pub fn i_jc(inst: &[u8], core: &mut Vcore) -> u64 {
     0
 }
-pub fn i_jc(inst: &[u8], regs: &mut Vcore) -> u64 {
+pub fn i_cc(inst: &[u8], core: &mut Vcore) -> u64 {
     0
 }
-pub fn i_cc(inst: &[u8], regs: &mut Vcore) -> u64 {
+pub fn i_r(inst: &[u8], core: &mut Vcore) -> u64 {
     0
 }
-pub fn i_r(inst: &[u8], regs: &mut Vcore) -> u64 {
+pub fn i_loop(inst: &[u8], core: &mut Vcore) -> u64 {
     0
 }
-pub fn i_loop(inst: &[u8], regs: &mut Vcore) -> u64 {
+pub fn i_ir(inst: &[u8], core: &mut Vcore) -> u64 {
     0
 }
-pub fn i_ir(inst: &[u8], regs: &mut Vcore) -> u64 {
+pub fn i_sysc(inst: &[u8], core: &mut Vcore) -> u64 {
     0
 }
-pub fn i_sysc(inst: &[u8], regs: &mut Vcore) -> u64 {
+pub fn i_sysr(inst: &[u8], core: &mut Vcore) -> u64 {
     0
 }
-pub fn i_sysr(inst: &[u8], regs: &mut Vcore) -> u64 {
+pub fn i_1b(inst: &[u8], core: &mut Vcore) -> u64 {
     0
 }
-pub fn i_1b(inst: &[u8], regs: &mut Vcore) -> u64 {
+pub fn i_ldi(inst: &[u8], core: &mut Vcore) -> u64 {
     0
 }
-pub fn i_ldi(inst: &[u8], regs: &mut Vcore) -> u64 {
+pub fn i_ldm(inst: &[u8], core: &mut Vcore) -> u64 {
     0
 }
-pub fn i_ldm(inst: &[u8], regs: &mut Vcore) -> u64 {
+pub fn i_stm(inst: &[u8], core: &mut Vcore) -> u64 {
     0
 }
-pub fn i_stm(inst: &[u8], regs: &mut Vcore) -> u64 {
+pub fn i_mv(inst: &[u8], core: &mut Vcore) -> u64 {
     0
 }
-pub fn i_mv(inst: &[u8], regs: &mut Vcore) -> u64 {
+pub fn i_in(inst: &[u8], core: &mut Vcore) -> u64 {
     0
 }
-pub fn i_in(inst: &[u8], regs: &mut Vcore) -> u64 {
+pub fn i_out(inst: &[u8], core: &mut Vcore) -> u64 {
     0
 }
-pub fn i_out(inst: &[u8], regs: &mut Vcore) -> u64 {
+pub fn i_22(inst: &[u8], core: &mut Vcore) -> u64 {
     0
 }
-pub fn i_22(inst: &[u8], regs: &mut Vcore) -> u64 {
+pub fn i_23(inst: &[u8], core: &mut Vcore) -> u64 {
     0
 }
-pub fn i_23(inst: &[u8], regs: &mut Vcore) -> u64 {
+pub fn i_24(inst: &[u8], core: &mut Vcore) -> u64 {
     0
 }
-pub fn i_24(inst: &[u8], regs: &mut Vcore) -> u64 {
+pub fn i_25(inst: &[u8], core: &mut Vcore) -> u64 {
     0
 }
-pub fn i_25(inst: &[u8], regs: &mut Vcore) -> u64 {
+pub fn i_26(inst: &[u8], core: &mut Vcore) -> u64 {
     0
 }
-pub fn i_26(inst: &[u8], regs: &mut Vcore) -> u64 {
+pub fn i_27(inst: &[u8], core: &mut Vcore) -> u64 {
     0
 }
-pub fn i_27(inst: &[u8], regs: &mut Vcore) -> u64 {
+pub fn i_28(inst: &[u8], core: &mut Vcore) -> u64 {
     0
 }
-pub fn i_28(inst: &[u8], regs: &mut Vcore) -> u64 {
+pub fn i_29(inst: &[u8], core: &mut Vcore) -> u64 {
     0
 }
-pub fn i_29(inst: &[u8], regs: &mut Vcore) -> u64 {
+pub fn i_2a(inst: &[u8], core: &mut Vcore) -> u64 {
     0
 }
-pub fn i_2a(inst: &[u8], regs: &mut Vcore) -> u64 {
+pub fn i_2b(inst: &[u8], core: &mut Vcore) -> u64 {
     0
 }
-pub fn i_2b(inst: &[u8], regs: &mut Vcore) -> u64 {
+pub fn i_2c(inst: &[u8], core: &mut Vcore) -> u64 {
     0
 }
-pub fn i_2c(inst: &[u8], regs: &mut Vcore) -> u64 {
+pub fn i_2d(inst: &[u8], core: &mut Vcore) -> u64 {
     0
 }
-pub fn i_2d(inst: &[u8], regs: &mut Vcore) -> u64 {
+pub fn i_2e(inst: &[u8], core: &mut Vcore) -> u64 {
     0
 }
-pub fn i_2e(inst: &[u8], regs: &mut Vcore) -> u64 {
+pub fn i_2f(inst: &[u8], core: &mut Vcore) -> u64 {
     0
 }
-pub fn i_2f(inst: &[u8], regs: &mut Vcore) -> u64 {
+pub fn i_ei(inst: &[u8], core: &mut Vcore) -> u64 {
     0
 }
-pub fn i_ei(inst: &[u8], regs: &mut Vcore) -> u64 {
+pub fn i_di(inst: &[u8], core: &mut Vcore) -> u64 {
     0
 }
-pub fn i_di(inst: &[u8], regs: &mut Vcore) -> u64 {
+pub fn i_ep(inst: &[u8], core: &mut Vcore) -> u64 {
     0
 }
-pub fn i_ep(inst: &[u8], regs: &mut Vcore) -> u64 {
+pub fn i_dp(inst: &[u8], core: &mut Vcore) -> u64 {
     0
 }
-pub fn i_dp(inst: &[u8], regs: &mut Vcore) -> u64 {
+pub fn i_livt(inst: &[u8], core: &mut Vcore) -> u64 {
     0
 }
-pub fn i_livt(inst: &[u8], regs: &mut Vcore) -> u64 {
+pub fn i_lkpt(inst: &[u8], core: &mut Vcore) -> u64 {
     0
 }
-pub fn i_lkpt(inst: &[u8], regs: &mut Vcore) -> u64 {
+pub fn i_lupt(inst: &[u8], core: &mut Vcore) -> u64 {
     0
 }
-pub fn i_lupt(inst: &[u8], regs: &mut Vcore) -> u64 {
+pub fn i_lscp(inst: &[u8], core: &mut Vcore) -> u64 {
     0
 }
-pub fn i_lscp(inst: &[u8], regs: &mut Vcore) -> u64 {
+pub fn i_lipdump(inst: &[u8], core: &mut Vcore) -> u64 {
     0
 }
-pub fn i_lipdump(inst: &[u8], regs: &mut Vcore) -> u64 {
+pub fn i_lflagdump(inst: &[u8], core: &mut Vcore) -> u64 {
     0
 }
-pub fn i_lflagdump(inst: &[u8], regs: &mut Vcore) -> u64 {
+pub fn i_sipdump(inst: &[u8], core: &mut Vcore) -> u64 {
     0
 }
-pub fn i_sipdump(inst: &[u8], regs: &mut Vcore) -> u64 {
+pub fn i_sflagdump(inst: &[u8], core: &mut Vcore) -> u64 {
     0
 }
-pub fn i_sflagdump(inst: &[u8], regs: &mut Vcore) -> u64 {
+pub fn i_cpuid(inst: &[u8], core: &mut Vcore) -> u64 {
     0
 }
-pub fn i_cpuid(inst: &[u8], regs: &mut Vcore) -> u64 {
+pub fn i_initext(inst: &[u8], core: &mut Vcore) -> u64 {
     0
 }
-pub fn i_initext(inst: &[u8], regs: &mut Vcore) -> u64 {
+pub fn i_destext(inst: &[u8], core: &mut Vcore) -> u64 {
     0
 }
-pub fn i_destext(inst: &[u8], regs: &mut Vcore) -> u64 {
-    0
-}
-pub fn i_3f(inst: &[u8], regs: &mut Vcore) -> u64 {
+pub fn i_3f(inst: &[u8], core: &mut Vcore) -> u64 {
     0
 }
