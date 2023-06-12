@@ -7,7 +7,7 @@ pub struct Memory {
 impl Memory {
     pub fn new(memory: usize) -> Self {
         Memory {
-            memory: SharedPointer::new("VcoreVriscMainMemory", memory).unwrap(),
+            memory: SharedPointer::new("VcoreVriscMainMemory".to_string(), memory).unwrap(),
         }
     }
 }
