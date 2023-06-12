@@ -1,3 +1,7 @@
+use std::{cell::RefCell, rc::Rc};
+
+use crate::memory::Memory;
+
 pub struct Registers {
     pub x: [u64; 16],
     pub ip: u64,
@@ -26,16 +30,38 @@ impl Registers {
     }
 }
 
+pub struct InterruptController {
+    intflag: bool,
+}
+
+impl InterruptController {
+    pub fn new() -> Self {
+        InterruptController { intflag: false }
+    }
+
+    pub fn interrupted(&self) -> bool {
+        self.intflag
+    }
+}
+
 pub struct Vcore {
     id: usize,
     regs: Registers,
+    memory: Rc<RefCell<Memory>>,
+    intctler: InterruptController,
 }
 
 impl Vcore {
-    pub fn new(id: usize) -> Self {
+    pub fn new(id: usize, memory: Rc<RefCell<Memory>>) -> Self {
         Vcore {
             id,
             regs: Registers::new(),
+            memory,
+            intctler: InterruptController::new(),
         }
+    }
+
+    pub fn interrupted(&self) -> bool {
+        self.intctler.interrupted()
     }
 }
