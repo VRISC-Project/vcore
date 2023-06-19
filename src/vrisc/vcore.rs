@@ -8,9 +8,9 @@ pub type VcoreInstruction = (fn(&[u8], &mut Vcore) -> u64, u64);
 
 pub enum FlagRegFlag {
     Zero = 0,
-    Equal = 1,
-    Symbol = 2,
-    Overflow = 3,
+    Symbol = 1,
+    Overflow = 2,
+    Equal = 3,
     Higher = 4,
     Lower = 5,
     Bigger = 6,
@@ -24,6 +24,8 @@ pub trait BitOptions {
     fn bit_set(&mut self, flag: FlagRegFlag);
     fn bit_reset(&mut self, flag: FlagRegFlag);
     fn bit_get(&self, flag: FlagRegFlag) -> bool;
+
+    fn mark_symbol(&mut self, reg_before: u64, reg_after: u64);
 }
 
 impl BitOptions for u64 {
@@ -38,6 +40,20 @@ impl BitOptions for u64 {
     fn bit_get(&self, flag: FlagRegFlag) -> bool {
         (*self & (1 << (flag as u64))) != 0
     }
+
+    fn mark_symbol(&mut self, reg_before: u64, reg_after: u64) {
+        *self &= 0xffff_ffff_ffff_fff8;
+        if reg_after == 0 {
+            self.bit_set(FlagRegFlag::Zero);
+        }
+        if *self & (1<<63) != 0 {
+            self.bit_set(FlagRegFlag::Symbol);
+        }
+        if reg_after < reg_before {
+            self.bit_set(FlagRegFlag::Overflow);
+        }
+    }
+
 }
 
 pub struct Registers {
