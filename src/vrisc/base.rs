@@ -1,51 +1,42 @@
 use std::{thread, time::Duration};
 
-use super::vcore::Vcore;
-
-type VcoreInstruction = fn(&[u8], &mut Vcore) -> u64;
+use super::vcore::{Vcore, VcoreInstruction};
 
 pub const BASE: [Option<VcoreInstruction>; 64] = [
-    Some(i_nop),
-    Some(i_add),
-    Some(i_sub),
-    Some(i_inc),
-    Some(i_dec),
-    Some(i_shl),
-    Some(i_shr),
-    Some(i_rol),
-    Some(i_ror),
-    Some(i_cmp),
-    Some(i_and),
-    Some(i_or),
-    Some(i_not),
-    Some(i_xor),
+    Some((i_nop, 1)),
+    Some((i_add, 3)),
+    Some((i_sub, 3)),
+    Some((i_inc, 2)),
+    Some((i_dec, 2)),
+    Some((i_shl, 3)),
+    Some((i_shr, 3)),
+    Some((i_rol, 3)),
+    Some((i_ror, 3)),
+    Some((i_cmp, 2)),
+    Some((i_and, 3)),
+    Some((i_or, 3)),
+    Some((i_not, 2)),
+    Some((i_xor, 3)),
     None,
     None,
     None,
     None,
     None,
     None,
-    Some(i_jc),
-    Some(i_cc),
-    Some(i_r),
-    Some(i_loop),
-    Some(i_ir),
-    Some(i_sysc),
-    Some(i_sysr),
+    Some((i_jc, 10)),
+    Some((i_cc, 10)),
+    Some((i_r, 1)),
+    Some((i_loop, 6)),
+    Some((i_ir, 2)),
+    Some((i_sysc, 1)),
+    Some((i_sysr, 1)),
     None,
-    Some(i_ldi),
-    Some(i_ldm),
-    Some(i_stm),
-    Some(i_mv),
-    Some(i_in),
-    Some(i_out),
-    None,
-    None,
-    None,
-    None,
-    None,
-    None,
-    None,
+    Some((i_ldi, 10)),
+    Some((i_ldm, 3)),
+    Some((i_stm, 3)),
+    Some((i_mv, 3)),
+    Some((i_in, 3)),
+    Some((i_out, 3)),
     None,
     None,
     None,
@@ -53,19 +44,26 @@ pub const BASE: [Option<VcoreInstruction>; 64] = [
     None,
     None,
     None,
-    Some(i_ei),
-    Some(i_di),
-    Some(i_ep),
-    Some(i_dp),
-    Some(i_livt),
-    Some(i_lkpt),
-    Some(i_lupt),
-    Some(i_lscp),
-    Some(i_lipdump),
-    Some(i_lflagdump),
-    Some(i_sipdump),
-    Some(i_sflagdump),
-    Some(i_cpuid),
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    Some((i_ei, 1)),
+    Some((i_di, 1)),
+    Some((i_ep, 1)),
+    Some((i_dp, 1)),
+    Some((i_livt, 2)),
+    Some((i_lkpt, 2)),
+    Some((i_lupt, 2)),
+    Some((i_lscp, 2)),
+    Some((i_lipdump, 2)),
+    Some((i_lflagdump, 2)),
+    Some((i_sipdump, 2)),
+    Some((i_sflagdump, 2)),
+    Some((i_cpuid, 1)),
     None,
     None,
     None,
@@ -79,53 +77,52 @@ pub const BASE: [Option<VcoreInstruction>; 64] = [
 // TODO
 
 pub fn i_nop(inst: &[u8], core: &mut Vcore) -> u64 {
-    println!("nop");
     loop {
         thread::sleep(Duration::from_millis(1));
-        if core.interrupted() {
+        if let Some(intid) = core.intctler.interrupted() {
             break;
         }
     }
     1
 }
 pub fn i_add(inst: &[u8], core: &mut Vcore) -> u64 {
-    0
+    3
 }
 pub fn i_sub(inst: &[u8], core: &mut Vcore) -> u64 {
-    0
+    3
 }
 pub fn i_inc(inst: &[u8], core: &mut Vcore) -> u64 {
-    0
+    2
 }
 pub fn i_dec(inst: &[u8], core: &mut Vcore) -> u64 {
-    0
+    2
 }
 pub fn i_shl(inst: &[u8], core: &mut Vcore) -> u64 {
-    0
+    3
 }
 pub fn i_shr(inst: &[u8], core: &mut Vcore) -> u64 {
-    0
+    3
 }
 pub fn i_rol(inst: &[u8], core: &mut Vcore) -> u64 {
-    0
+    3
 }
 pub fn i_ror(inst: &[u8], core: &mut Vcore) -> u64 {
-    0
+    3
 }
 pub fn i_cmp(inst: &[u8], core: &mut Vcore) -> u64 {
-    0
+    2
 }
 pub fn i_and(inst: &[u8], core: &mut Vcore) -> u64 {
-    0
+    3
 }
 pub fn i_or(inst: &[u8], core: &mut Vcore) -> u64 {
-    0
+    3
 }
 pub fn i_not(inst: &[u8], core: &mut Vcore) -> u64 {
-    0
+    2
 }
 pub fn i_xor(inst: &[u8], core: &mut Vcore) -> u64 {
-    0
+    3
 }
 pub fn i_0e(inst: &[u8], core: &mut Vcore) -> u64 {
     0
@@ -146,46 +143,46 @@ pub fn i_13(inst: &[u8], core: &mut Vcore) -> u64 {
     0
 }
 pub fn i_jc(inst: &[u8], core: &mut Vcore) -> u64 {
-    0
+    10
 }
 pub fn i_cc(inst: &[u8], core: &mut Vcore) -> u64 {
-    0
+    10
 }
 pub fn i_r(inst: &[u8], core: &mut Vcore) -> u64 {
-    0
+    1
 }
 pub fn i_loop(inst: &[u8], core: &mut Vcore) -> u64 {
-    0
+    6
 }
 pub fn i_ir(inst: &[u8], core: &mut Vcore) -> u64 {
-    0
+    2
 }
 pub fn i_sysc(inst: &[u8], core: &mut Vcore) -> u64 {
-    0
+    1
 }
 pub fn i_sysr(inst: &[u8], core: &mut Vcore) -> u64 {
-    0
+    1
 }
 pub fn i_1b(inst: &[u8], core: &mut Vcore) -> u64 {
     0
 }
 pub fn i_ldi(inst: &[u8], core: &mut Vcore) -> u64 {
-    0
+    10
 }
 pub fn i_ldm(inst: &[u8], core: &mut Vcore) -> u64 {
-    0
+    3
 }
 pub fn i_stm(inst: &[u8], core: &mut Vcore) -> u64 {
-    0
+    3
 }
 pub fn i_mv(inst: &[u8], core: &mut Vcore) -> u64 {
-    0
+    3
 }
 pub fn i_in(inst: &[u8], core: &mut Vcore) -> u64 {
-    0
+    3
 }
 pub fn i_out(inst: &[u8], core: &mut Vcore) -> u64 {
-    0
+    3
 }
 pub fn i_22(inst: &[u8], core: &mut Vcore) -> u64 {
     0
@@ -230,48 +227,48 @@ pub fn i_2f(inst: &[u8], core: &mut Vcore) -> u64 {
     0
 }
 pub fn i_ei(inst: &[u8], core: &mut Vcore) -> u64 {
-    0
+    1
 }
 pub fn i_di(inst: &[u8], core: &mut Vcore) -> u64 {
-    0
+    1
 }
 pub fn i_ep(inst: &[u8], core: &mut Vcore) -> u64 {
-    0
+    1
 }
 pub fn i_dp(inst: &[u8], core: &mut Vcore) -> u64 {
-    0
+    1
 }
 pub fn i_livt(inst: &[u8], core: &mut Vcore) -> u64 {
-    0
+    2
 }
 pub fn i_lkpt(inst: &[u8], core: &mut Vcore) -> u64 {
-    0
+    2
 }
 pub fn i_lupt(inst: &[u8], core: &mut Vcore) -> u64 {
-    0
+    2
 }
 pub fn i_lscp(inst: &[u8], core: &mut Vcore) -> u64 {
-    0
+    2
 }
 pub fn i_lipdump(inst: &[u8], core: &mut Vcore) -> u64 {
-    0
+    2
 }
 pub fn i_lflagdump(inst: &[u8], core: &mut Vcore) -> u64 {
-    0
+    2
 }
 pub fn i_sipdump(inst: &[u8], core: &mut Vcore) -> u64 {
-    0
+    2
 }
 pub fn i_sflagdump(inst: &[u8], core: &mut Vcore) -> u64 {
-    0
+    2
 }
 pub fn i_cpuid(inst: &[u8], core: &mut Vcore) -> u64 {
+    1
+}
+pub fn i_initext(_inst: &[u8], _core: &mut Vcore) -> u64 {
     0
 }
-pub fn i_initext(inst: &[u8], core: &mut Vcore) -> u64 {
-    0
-}
-pub fn i_destext(inst: &[u8], core: &mut Vcore) -> u64 {
+pub fn i_destext(_inst: &[u8], _core: &mut Vcore) -> u64 {
     0
 }
 pub fn i_3f(inst: &[u8], core: &mut Vcore) -> u64 {

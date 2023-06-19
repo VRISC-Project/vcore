@@ -75,37 +75,43 @@ impl<T> Drop for SharedPointer<T> {
 }
 
 impl<T> SharedPointer<T> {
-    pub fn slice<'a>(&self, addr: usize, mut len: usize) -> &'a [T] {
-        if addr + len > self.size {
-            len = self.size - addr;
+    pub fn slice<'a>(&self, addr: u64, mut len: u64) -> &'a [T] {
+        if (addr + len) as usize > self.size {
+            len = self.size as u64 - addr;
         }
-        unsafe { slice::from_raw_parts((self.pointer as usize + addr) as *mut T, len) }
+        unsafe { slice::from_raw_parts((self.pointer as u64 + addr) as *mut T, len as usize) }
     }
 
-    pub fn slice_mut<'a>(&self, addr: usize, mut len: usize) -> &'a mut [T] {
-        if addr + len > self.size {
-            len = self.size - addr;
+    pub fn slice_mut<'a>(&self, addr: u64, mut len: u64) -> &'a mut [T] {
+        if (addr + len) as usize > self.size {
+            len = self.size as u64 - addr;
         }
-        unsafe { slice::from_raw_parts_mut((self.pointer as usize + addr) as *mut T, len) }
+        unsafe { slice::from_raw_parts_mut((self.pointer as u64 + addr) as *mut T, len as usize) }
     }
 
-    pub fn at<'a>(&self, addr: usize) -> &'a T {
-        unsafe { ((self.pointer as usize + addr) as *mut T).as_ref() }.unwrap()
+    pub fn at<'a>(&self, addr: u64) -> &'a T {
+        unsafe { ((self.pointer as u64 + addr) as *mut T).as_ref() }.unwrap()
     }
 
-    pub fn at_mut<'a>(&self, addr: usize) -> &'a mut T {
-        unsafe { ((self.pointer as usize + addr) as *mut T).as_mut() }.unwrap()
+    pub fn at_mut<'a>(&self, addr: u64) -> &'a mut T {
+        unsafe { ((self.pointer as u64 + addr) as *mut T).as_mut() }.unwrap()
     }
 
-    pub fn write(&mut self, addr: usize, t: T) {
-        if addr < self.size {
-            unsafe { *((self.pointer as usize + addr) as *mut T) = t };
+    pub fn write(&mut self, addr: u64, t: T) {
+        if (addr as usize) < self.size {
+            unsafe { *((self.pointer as u64 + addr) as *mut T) = t };
         }
     }
 
-    pub fn write_slice(&mut self, addr: usize, s: &[T]) {
-        if addr + s.len() < self.size {
-            unsafe { ((self.pointer as usize + addr) as *mut T).copy_from(s.as_ptr(), s.len()) };
+    pub fn write_slice(&mut self, addr: u64, s: &[T]) {
+        if addr as usize + s.len() < self.size {
+            unsafe { ((self.pointer as u64 + addr) as *mut T).copy_from(s.as_ptr(), s.len()) };
         }
+    }
+}
+
+impl<T> SharedPointer<T> {
+    pub fn size(&self) -> usize {
+        self.size
     }
 }
