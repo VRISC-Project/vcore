@@ -236,38 +236,279 @@ pub fn i_dec(inst: &[u8], core: &mut Vcore) -> u64 {
 }
 
 pub fn i_shl(inst: &[u8], core: &mut Vcore) -> u64 {
+    let reg_before = core.regs.x[inst[1].higher() as usize];
+    let shbits = core.regs.x[inst[1].lower() as usize];
+    match inst[2].lower() {
+        0 => {
+            let mut r2 = reg_before as u8;
+            r2 <<= shbits;
+            core.regs.x[inst[1].higher() as usize] %= 0x100;
+            core.regs.x[inst[1].higher() as usize] |= r2 as u64;
+        }
+        1 => {
+            let mut r2 = reg_before as u16;
+            r2 <<= shbits;
+            core.regs.x[inst[1].higher() as usize] %= 0x1_0000;
+            core.regs.x[inst[1].higher() as usize] |= r2 as u64;
+        }
+        2 => {
+            let mut r2 = reg_before as u32;
+            r2 <<= shbits;
+            core.regs.x[inst[1].higher() as usize] %= 0x1_0000_0000;
+            core.regs.x[inst[1].higher() as usize] |= r2 as u64;
+        }
+        3 => {
+            core.regs.x[inst[1].higher() as usize] <<= shbits;
+        }
+        _ => (),
+    }
+    core.regs
+        .flag
+        .mark_symbol(reg_before, core.regs.x[inst[1].higher() as usize]);
     3
 }
 
 pub fn i_shr(inst: &[u8], core: &mut Vcore) -> u64 {
+    let reg_before = core.regs.x[inst[1].higher() as usize];
+    let shbits = core.regs.x[inst[1].lower() as usize];
+    match inst[2].lower() {
+        0 => {
+            let mut r2 = reg_before as u8;
+            r2 >>= shbits;
+            core.regs.x[inst[1].higher() as usize] %= 0x100;
+            core.regs.x[inst[1].higher() as usize] |= r2 as u64;
+        }
+        1 => {
+            let mut r2 = reg_before as u16;
+            r2 >>= shbits;
+            core.regs.x[inst[1].higher() as usize] %= 0x1_0000;
+            core.regs.x[inst[1].higher() as usize] |= r2 as u64;
+        }
+        2 => {
+            let mut r2 = reg_before as u32;
+            r2 >>= shbits;
+            core.regs.x[inst[1].higher() as usize] %= 0x1_0000_0000;
+            core.regs.x[inst[1].higher() as usize] |= r2 as u64;
+        }
+        3 => {
+            core.regs.x[inst[1].higher() as usize] >>= shbits;
+        }
+        _ => (),
+    }
+    core.regs
+        .flag
+        .mark_symbol(reg_before, core.regs.x[inst[1].higher() as usize]);
     3
 }
 
 pub fn i_rol(inst: &[u8], core: &mut Vcore) -> u64 {
+    let reg_before = core.regs.x[inst[1].higher() as usize];
+    let shbits = core.regs.x[inst[1].lower() as usize];
+    match inst[2].lower() {
+        0 => {
+            let mut r2 = 0u8;
+            r2 |= (reg_before as u8) << shbits;
+            r2 |= (reg_before as u8) >> (8 - shbits);
+            core.regs.x[inst[1].higher() as usize] %= 0x100;
+            core.regs.x[inst[1].higher() as usize] = r2 as u64;
+        }
+        1 => {
+            let mut r2 = 0u16;
+            r2 |= (reg_before as u16) << shbits;
+            r2 |= (reg_before as u16) >> (16 - shbits);
+            core.regs.x[inst[1].higher() as usize] %= 0x1_0000;
+            core.regs.x[inst[1].higher() as usize] = r2 as u64;
+        }
+        2 => {
+            let mut r2 = 0u32;
+            r2 |= (reg_before as u32) << shbits;
+            r2 |= (reg_before as u32) >> (32 - shbits);
+            core.regs.x[inst[1].higher() as usize] %= 0x1_0000_0000;
+            core.regs.x[inst[1].higher() as usize] = r2 as u64;
+        }
+        3 => {
+            let mut r2 = 0u64;
+            r2 |= reg_before << shbits;
+            r2 |= reg_before >> (64 - shbits);
+            core.regs.x[inst[1].higher() as usize] = r2;
+        }
+        _ => (),
+    }
+    core.regs
+        .flag
+        .mark_symbol(reg_before, core.regs.x[inst[1].higher() as usize]);
+    core.regs.flag.bit_reset(FlagRegFlag::Overflow);
     3
 }
 
 pub fn i_ror(inst: &[u8], core: &mut Vcore) -> u64 {
+    let reg_before = core.regs.x[inst[1].higher() as usize];
+    let shbits = core.regs.x[inst[1].lower() as usize];
+    match inst[2].lower() {
+        0 => {
+            let mut r2 = 0u8;
+            r2 |= (reg_before as u8) >> shbits;
+            r2 |= (reg_before as u8) << (8 - shbits);
+            core.regs.x[inst[1].higher() as usize] %= 0x100;
+            core.regs.x[inst[1].higher() as usize] = r2 as u64;
+        }
+        1 => {
+            let mut r2 = 0u16;
+            r2 |= (reg_before as u16) >> shbits;
+            r2 |= (reg_before as u16) << (16 - shbits);
+            core.regs.x[inst[1].higher() as usize] %= 0x1_0000;
+            core.regs.x[inst[1].higher() as usize] = r2 as u64;
+        }
+        2 => {
+            let mut r2 = 0u32;
+            r2 |= (reg_before as u32) >> shbits;
+            r2 |= (reg_before as u32) << (32 - shbits);
+            core.regs.x[inst[1].higher() as usize] %= 0x1_0000_0000;
+            core.regs.x[inst[1].higher() as usize] = r2 as u64;
+        }
+        3 => {
+            let mut r2 = 0u64;
+            r2 |= reg_before >> shbits;
+            r2 |= reg_before << (64 - shbits);
+            core.regs.x[inst[1].higher() as usize] = r2;
+        }
+        _ => (),
+    }
+    core.regs
+        .flag
+        .mark_symbol(reg_before, core.regs.x[inst[1].higher() as usize]);
+    core.regs.flag.bit_reset(FlagRegFlag::Overflow);
     3
 }
 
 pub fn i_cmp(inst: &[u8], core: &mut Vcore) -> u64 {
+    let r1 = inst[1].lower() as usize;
+    let r2 = inst[1].higher() as usize;
+    //相等标志
+    if core.regs.x[r1] == core.regs.x[r2] {
+        core.regs.flag.bit_set(FlagRegFlag::Equal);
+        core.regs.flag.bit_reset(FlagRegFlag::Higher);
+        core.regs.flag.bit_reset(FlagRegFlag::Lower);
+        core.regs.flag.bit_reset(FlagRegFlag::Bigger);
+        core.regs.flag.bit_reset(FlagRegFlag::Smaller);
+    } else {
+        core.regs.flag.bit_reset(FlagRegFlag::Equal);
+        //无符号大于小于
+        if core.regs.x[r1] > core.regs.x[r2] {
+            core.regs.flag.bit_set(FlagRegFlag::Higher);
+            core.regs.flag.bit_reset(FlagRegFlag::Lower);
+        } else {
+            core.regs.flag.bit_set(FlagRegFlag::Lower);
+            core.regs.flag.bit_reset(FlagRegFlag::Higher);
+        }
+        //有符号大于小于
+        if core.regs.x[r1] as i64 > core.regs.x[r2] as i64 {
+            core.regs.flag.bit_set(FlagRegFlag::Higher);
+            core.regs.flag.bit_reset(FlagRegFlag::Lower);
+        } else {
+            core.regs.flag.bit_set(FlagRegFlag::Lower);
+            core.regs.flag.bit_reset(FlagRegFlag::Higher);
+        }
+    }
     2
 }
 
 pub fn i_and(inst: &[u8], core: &mut Vcore) -> u64 {
+    let r1 = inst[1].lower() as usize;
+    let r2 = inst[1].higher() as usize;
+    let r3 = inst[2].lower() as usize;
+    let reg_before = core.regs.x[r1].max(core.regs.x[r2]);
+    match inst[2].higher() {
+        0 => {
+            core.regs.x[r3] = (core.regs.x[r1] as u8 & core.regs.x[r2] as u8) as u64;
+        }
+        1 => {
+            core.regs.x[r3] = (core.regs.x[r1] as u16 & core.regs.x[r2] as u16) as u64;
+        }
+        2 => {
+            core.regs.x[r3] = (core.regs.x[r1] as u32 & core.regs.x[r2] as u32) as u64;
+        }
+        3 => {
+            core.regs.x[r3] = core.regs.x[r1] & core.regs.x[r2];
+        }
+        _ => (),
+    }
+    core.regs.flag.mark_symbol(reg_before, core.regs.x[r3]);
+    core.regs.flag.bit_reset(FlagRegFlag::Overflow);
     3
 }
 
 pub fn i_or(inst: &[u8], core: &mut Vcore) -> u64 {
+    let r1 = inst[1].lower() as usize;
+    let r2 = inst[1].higher() as usize;
+    let r3 = inst[2].lower() as usize;
+    let reg_before = core.regs.x[r1].max(core.regs.x[r2]);
+    match inst[2].higher() {
+        0 => {
+            core.regs.x[r3] = (core.regs.x[r1] as u8 | core.regs.x[r2] as u8) as u64;
+        }
+        1 => {
+            core.regs.x[r3] = (core.regs.x[r1] as u16 | core.regs.x[r2] as u16) as u64;
+        }
+        2 => {
+            core.regs.x[r3] = (core.regs.x[r1] as u32 | core.regs.x[r2] as u32) as u64;
+        }
+        3 => {
+            core.regs.x[r3] = core.regs.x[r1] | core.regs.x[r2];
+        }
+        _ => (),
+    }
+    core.regs.flag.mark_symbol(reg_before, core.regs.x[r3]);
+    core.regs.flag.bit_reset(FlagRegFlag::Overflow);
     3
 }
 
 pub fn i_not(inst: &[u8], core: &mut Vcore) -> u64 {
+    let r1 = inst[1].lower() as usize;
+    let r2 = inst[1].higher() as usize;
+    let reg_before = core.regs.x[r1];
+    match inst[2].lower() {
+        0 => {
+            core.regs.x[r2] = (!(core.regs.x[r1] as u8)) as u64;
+        }
+        1 => {
+            core.regs.x[r2] = (!(core.regs.x[r1] as u16)) as u64;
+        }
+        2 => {
+            core.regs.x[r2] = (!(core.regs.x[r1] as u32)) as u64;
+        }
+        3 => {
+            core.regs.x[r2] = !core.regs.x[r2];
+        }
+        _ => (),
+    }
+    core.regs.flag.mark_symbol(core.regs.x[r1], core.regs.x[r2]);
+    core.regs.flag.bit_reset(FlagRegFlag::Overflow);
     2
 }
 
 pub fn i_xor(inst: &[u8], core: &mut Vcore) -> u64 {
+    let r1 = inst[1].lower() as usize;
+    let r2 = inst[1].higher() as usize;
+    let r3 = inst[2].lower() as usize;
+    let reg_before = core.regs.x[r1].max(core.regs.x[r2]);
+    match inst[2].higher() {
+        0 => {
+            core.regs.x[r3] = (core.regs.x[r1] as u8 ^ core.regs.x[r2] as u8) as u64;
+        }
+        1 => {
+            core.regs.x[r3] = (core.regs.x[r1] as u16 ^ core.regs.x[r2] as u16) as u64;
+        }
+        2 => {
+            core.regs.x[r3] = (core.regs.x[r1] as u32 ^ core.regs.x[r2] as u32) as u64;
+        }
+        3 => {
+            core.regs.x[r3] = core.regs.x[r1] ^ core.regs.x[r2];
+        }
+        _ => (),
+    }
+    core.regs.flag.mark_symbol(reg_before, core.regs.x[r3]);
+    core.regs.flag.bit_reset(FlagRegFlag::Overflow);
     3
 }
 
