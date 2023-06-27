@@ -23,6 +23,10 @@ impl Memory {
         &self.memory
     }
 
+    pub fn borrow_mut(&mut self) -> &mut SharedPointer<u8> {
+        &mut self.memory
+    }
+
     pub fn address(&mut self, addr: u64, flag: u64) -> Result<u64, AddressError> {
         let target = if flag.bit_get(FlagRegFlag::PagingEnabled) {
             todo!();
