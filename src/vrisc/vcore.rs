@@ -20,12 +20,52 @@ pub enum FlagRegFlag {
     Privilege = 10,
 }
 
+pub enum ConditionCode {
+    None = 0,
+    Zero = 1,
+    Signed = 2,
+    Overflow = 3,
+    Equal = 4,
+    NonEqual = 5,
+    Higher = 6,
+    Lower = 7,
+    NonHigher = 8,
+    NonLower = 9,
+    Bigger = 10,
+    Smaller = 11,
+    NonBigger = 12,
+    NonSmaller = 13,
+}
+
+impl ConditionCode {
+    pub fn new(cond: u8) -> Self {
+        match cond {
+            0 => ConditionCode::None,
+            1 => ConditionCode::Zero,
+            2 => ConditionCode::Signed,
+            3 => ConditionCode::Overflow,
+            4 => ConditionCode::Equal,
+            5 => ConditionCode::NonEqual,
+            6 => ConditionCode::Higher,
+            7 => ConditionCode::Lower,
+            8 => ConditionCode::NonHigher,
+            9 => ConditionCode::NonLower,
+            10 => ConditionCode::Bigger,
+            11 => ConditionCode::Smaller,
+            12 => ConditionCode::NonBigger,
+            13 => ConditionCode::NonSmaller,
+            _ => ConditionCode::None,
+        }
+    }
+}
+
 pub trait BitOptions {
     fn bit_set(&mut self, flag: FlagRegFlag);
     fn bit_reset(&mut self, flag: FlagRegFlag);
     fn bit_get(&self, flag: FlagRegFlag) -> bool;
 
     fn mark_symbol(&mut self, reg_before: u64, reg_after: u64);
+    fn satisfies_condition(&self, cond: ConditionCode) -> bool;
 }
 
 impl BitOptions for u64 {
@@ -46,7 +86,7 @@ impl BitOptions for u64 {
         if reg_after == 0 {
             self.bit_set(FlagRegFlag::Zero);
         }
-        if *self & (1<<63) != 0 {
+        if *self & (1 << 63) != 0 {
             self.bit_set(FlagRegFlag::Symbol);
         }
         if reg_after < reg_before {
@@ -54,6 +94,24 @@ impl BitOptions for u64 {
         }
     }
 
+    fn satisfies_condition(&self, cond: ConditionCode) -> bool {
+        match cond {
+            ConditionCode::None => true,
+            ConditionCode::Zero => self.bit_get(FlagRegFlag::Zero),
+            ConditionCode::Signed => self.bit_get(FlagRegFlag::Symbol),
+            ConditionCode::Overflow => self.bit_get(FlagRegFlag::Overflow),
+            ConditionCode::Equal => self.bit_get(FlagRegFlag::Equal),
+            ConditionCode::NonEqual => !self.bit_get(FlagRegFlag::Equal),
+            ConditionCode::Higher => self.bit_get(FlagRegFlag::Higher),
+            ConditionCode::Lower => self.bit_get(FlagRegFlag::Lower),
+            ConditionCode::NonHigher => !self.bit_get(FlagRegFlag::Higher),
+            ConditionCode::NonLower => !self.bit_get(FlagRegFlag::Lower),
+            ConditionCode::Bigger => self.bit_get(FlagRegFlag::Bigger),
+            ConditionCode::Smaller => self.bit_get(FlagRegFlag::Smaller),
+            ConditionCode::NonBigger => !self.bit_get(FlagRegFlag::Bigger),
+            ConditionCode::NonSmaller => !self.bit_get(FlagRegFlag::Smaller),
+        }
+    }
 }
 
 pub struct Registers {
@@ -83,6 +141,19 @@ impl Registers {
             ipdump: 0,
             flagdump: 0,
         }
+    }
+
+    pub fn reset(&mut self) {
+        self.x.copy_from_slice(&[0; 16]);
+        self.ip = 0;
+        self.flag = 0;
+        self.ivt = 0;
+        self.kpt = 0;
+        self.upt = 0;
+        self.scp = 0;
+        self.imsg = 0;
+        self.ipdump = 0;
+        self.flagdump = 0;
     }
 }
 
@@ -139,6 +210,11 @@ impl InterruptController {
 
     pub fn reset_intflag(&mut self) {
         self.intflag = false;
+    }
+
+    pub fn reset(&mut self) {
+        self.intflag = false;
+        self.intid = InterruptId::NI;
     }
 }
 
@@ -205,5 +281,27 @@ impl Vcore {
 
     pub fn id(&self) -> usize {
         self.id
+    }
+
+    pub fn reset(&mut self) {
+        self.regs.reset();
+        self.intctler.reset();
+        self.ip_increment = 0;
+        self.transferred = true;
+        self.instruction_space.copy_from_slice(&[None; 256]);
+        self.init();
+    }
+
+    // 特权级检查
+    // 只需在特权指令中调用
+    // 若为内核态返回true，若为用户态返回false
+    // 自动产生中断
+    pub fn privilege_test(&mut self) -> bool {
+        if self.regs.flag.bit_get(FlagRegFlag::Privilege) {
+            self.intctler.interrupt(InterruptId::InvalidInstruction);
+            false
+        } else {
+            true
+        }
     }
 }
