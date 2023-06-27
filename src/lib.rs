@@ -45,7 +45,7 @@ pub fn run(config: Config) {
 
 fn vcore(memory_size: usize, id: usize) {
     let core_startflg = SharedPointer::<bool>::bind(format!("VcoreCore{}StartFlg", id), 1).unwrap();
-    // 指令计数，计算从a开始运行到现在此核心o共运行了多少条指令
+    // 指令计数，计算从a开始运行到现在此核心共运行了多少条指令
     // 用于vcore父进程统计执行速度等
     let mut core_instruction_count =
         SharedPointer::<u64>::bind(format!("VcoreCore{}InstCount", id), 1).unwrap();
@@ -112,15 +112,15 @@ fn vcore(memory_size: usize, id: usize) {
         // 这里有个例外
         // opcode=0x3d,0x3e分别是initext和destext指令
         // 目前不予支持
-        // 等项目成熟之后再添加a这两个指令
+        // 等项目成熟之后再添加这两个指令
         // 现在这两个指令依然会产生InvalidInstruction
         // TODO
+        // 添加指令执行内容需在base.rs中实现，并加入到指令空间中
         if let None = core.instruction_space[opcode as usize] {
             core.intctler.interrupt(InterruptId::InvalidInstruction);
             continue;
         }
         let instlen = core.instruction_space[opcode as usize].unwrap().1;
-        // let inst = core.memory().borrow().borrow().slice(hot_ip, instlen);
         // 读取指令，首先判断指令是否跨越最小页边界
         // 若指令跨越最小页边界
         // 对下一个页起始地址寻址
