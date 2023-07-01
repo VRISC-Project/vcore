@@ -789,73 +789,73 @@ pub fn i_stm(inst: &[u8], core: &mut Vcore) -> u64 {
     3
 }
 
-pub fn i_1f(inst: &[u8], core: &mut Vcore) -> u64 {
+pub fn i_1f(_inst: &[u8], _core: &mut Vcore) -> u64 {
     0
 }
 
-pub fn i_in(inst: &[u8], core: &mut Vcore) -> u64 {
+pub fn i_in(_inst: &[u8], _core: &mut Vcore) -> u64 {
     todo!();
     3
 }
 
-pub fn i_out(inst: &[u8], core: &mut Vcore) -> u64 {
+pub fn i_out(_inst: &[u8], _core: &mut Vcore) -> u64 {
     todo!();
     3
 }
 
-pub fn i_22(inst: &[u8], core: &mut Vcore) -> u64 {
+pub fn i_22(_inst: &[u8], _core: &mut Vcore) -> u64 {
     0
 }
 
-pub fn i_23(inst: &[u8], core: &mut Vcore) -> u64 {
+pub fn i_23(_inst: &[u8], _core: &mut Vcore) -> u64 {
     0
 }
 
-pub fn i_24(inst: &[u8], core: &mut Vcore) -> u64 {
+pub fn i_24(_inst: &[u8], _core: &mut Vcore) -> u64 {
     0
 }
 
-pub fn i_25(inst: &[u8], core: &mut Vcore) -> u64 {
+pub fn i_25(_inst: &[u8], _core: &mut Vcore) -> u64 {
     0
 }
 
-pub fn i_26(inst: &[u8], core: &mut Vcore) -> u64 {
+pub fn i_26(_inst: &[u8], _core: &mut Vcore) -> u64 {
     0
 }
 
-pub fn i_27(inst: &[u8], core: &mut Vcore) -> u64 {
+pub fn i_27(_inst: &[u8], _core: &mut Vcore) -> u64 {
     0
 }
 
-pub fn i_28(inst: &[u8], core: &mut Vcore) -> u64 {
+pub fn i_28(_inst: &[u8], _core: &mut Vcore) -> u64 {
     0
 }
 
-pub fn i_29(inst: &[u8], core: &mut Vcore) -> u64 {
+pub fn i_29(_inst: &[u8], _core: &mut Vcore) -> u64 {
     0
 }
 
-pub fn i_2a(inst: &[u8], core: &mut Vcore) -> u64 {
+pub fn i_2a(_inst: &[u8], _core: &mut Vcore) -> u64 {
     0
 }
 
-pub fn i_2b(inst: &[u8], core: &mut Vcore) -> u64 {
+pub fn i_2b(_inst: &[u8], _core: &mut Vcore) -> u64 {
     0
 }
 
-pub fn i_2c(inst: &[u8], core: &mut Vcore) -> u64 {
+pub fn i_2c(_inst: &[u8], _core: &mut Vcore) -> u64 {
     0
 }
 
-pub fn i_2d(inst: &[u8], core: &mut Vcore) -> u64 {
+pub fn i_2d(_inst: &[u8], _core: &mut Vcore) -> u64 {
     0
 }
 
-pub fn i_2e(inst: &[u8], core: &mut Vcore) -> u64 {
+pub fn i_2e(_inst: &[u8], _core: &mut Vcore) -> u64 {
     0
 }
 
-pub fn i_2f(inst: &[u8], core: &mut Vcore) -> u64 {
+pub fn i_2f(_inst: &[u8], _core: &mut Vcore) -> u64 {
     0
 }
 
@@ -943,7 +943,7 @@ pub fn i_sflagdump(inst: &[u8], core: &mut Vcore) -> u64 {
     2
 }
 
-pub fn i_cpuid(inst: &[u8], core: &mut Vcore) -> u64 {
+pub fn i_cpuid(_inst: &[u8], core: &mut Vcore) -> u64 {
     match core.regs.x[0] {
         0 => {
             // 52 57 53 20 56 72 69 73 | 63 20 56 63 6F 72 65 20 | 30 2E 30 2E 31
@@ -985,6 +985,6 @@ pub fn i_destext(_inst: &[u8], _core: &mut Vcore) -> u64 {
     0
 }
 
-pub fn i_3f(inst: &[u8], core: &mut Vcore) -> u64 {
+pub fn i_3f(_inst: &[u8], _core: &mut Vcore) -> u64 {
     0
 }
