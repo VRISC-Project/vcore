@@ -1,6 +1,6 @@
 use std::{thread, time::Duration};
 
-use super::vcore::{BitOptions, FlagRegFlag, Vcore, VcoreInstruction};
+use super::vcore::{BitOptions, ConditionCode, FlagRegFlag, InterruptId, Vcore, VcoreInstruction};
 
 pub const BASE: [Option<VcoreInstruction>; 64] = [
     Some((i_nop, 1)),
@@ -34,7 +34,7 @@ pub const BASE: [Option<VcoreInstruction>; 64] = [
     Some((i_ldi, 10)),
     Some((i_ldm, 3)),
     Some((i_stm, 3)),
-    Some((i_mv, 3)),
+    None,
     Some((i_in, 3)),
     Some((i_out, 3)),
     None,
@@ -466,7 +466,6 @@ pub fn i_or(inst: &[u8], core: &mut Vcore) -> u64 {
 pub fn i_not(inst: &[u8], core: &mut Vcore) -> u64 {
     let r1 = inst[1].lower() as usize;
     let r2 = inst[1].higher() as usize;
-    let reg_before = core.regs.x[r1];
     match inst[2].lower() {
         0 => {
             core.regs.x[r2] = (!(core.regs.x[r1] as u8)) as u64;
@@ -512,83 +511,295 @@ pub fn i_xor(inst: &[u8], core: &mut Vcore) -> u64 {
     3
 }
 
-pub fn i_0e(inst: &[u8], core: &mut Vcore) -> u64 {
+pub fn i_0e(_inst: &[u8], _core: &mut Vcore) -> u64 {
     0
 }
 
-pub fn i_0f(inst: &[u8], core: &mut Vcore) -> u64 {
+pub fn i_0f(_inst: &[u8], _core: &mut Vcore) -> u64 {
     0
 }
 
-pub fn i_10(inst: &[u8], core: &mut Vcore) -> u64 {
+pub fn i_10(_inst: &[u8], _core: &mut Vcore) -> u64 {
     0
 }
 
-pub fn i_11(inst: &[u8], core: &mut Vcore) -> u64 {
+pub fn i_11(_inst: &[u8], _core: &mut Vcore) -> u64 {
     0
 }
 
-pub fn i_12(inst: &[u8], core: &mut Vcore) -> u64 {
+pub fn i_12(_inst: &[u8], _core: &mut Vcore) -> u64 {
     0
 }
 
-pub fn i_13(inst: &[u8], core: &mut Vcore) -> u64 {
+pub fn i_13(_inst: &[u8], _core: &mut Vcore) -> u64 {
     0
 }
 
 pub fn i_jc(inst: &[u8], core: &mut Vcore) -> u64 {
-    10
+    if core
+        .regs
+        .flag
+        .satisfies_condition(ConditionCode::new(inst[1].higher()))
+    {
+        match inst[1].lower() {
+            0 => {
+                core.regs.ip = (inst[2] as u16 | ((inst[3] as u16) << 8)) as u64;
+            }
+            1 => {
+                core.regs.ip = (inst[2] as u32
+                    | ((inst[3] as u32) << 8)
+                    | ((inst[4] as u32) << 16)
+                    | ((inst[5] as u32) << 24)) as u64;
+            }
+            2 => {
+                core.regs.ip = (inst[2] as u64
+                    | ((inst[3] as u64) << 8)
+                    | ((inst[4] as u64) << 16)
+                    | ((inst[5] as u64) << 24)
+                    | ((inst[6] as u64) << 32)
+                    | ((inst[7] as u64) << 40)
+                    | ((inst[8] as u64) << 48)
+                    | ((inst[9] as u64) << 56)) as u64;
+            }
+            _ => (),
+        }
+        core.transferred = true;
+    }
+    match inst[1].lower() {
+        0 => 4,
+        1 => 6,
+        2 => 10,
+        _ => 0,
+    }
 }
 
 pub fn i_cc(inst: &[u8], core: &mut Vcore) -> u64 {
-    10
+    if core
+        .regs
+        .flag
+        .satisfies_condition(ConditionCode::new(inst[1].higher()))
+    {
+        core.regs.ipdump = core.regs.ip;
+        match inst[1].lower() {
+            0 => {
+                core.regs.ip = (inst[2] as u16 | ((inst[3] as u16) << 8)) as u64;
+            }
+            1 => {
+                core.regs.ip = (inst[2] as u32
+                    | ((inst[3] as u32) << 8)
+                    | ((inst[4] as u32) << 16)
+                    | ((inst[5] as u32) << 24)) as u64;
+            }
+            2 => {
+                core.regs.ip = (inst[2] as u64
+                    | ((inst[3] as u64) << 8)
+                    | ((inst[4] as u64) << 16)
+                    | ((inst[5] as u64) << 24)
+                    | ((inst[6] as u64) << 32)
+                    | ((inst[7] as u64) << 40)
+                    | ((inst[8] as u64) << 48)
+                    | ((inst[9] as u64) << 56)) as u64;
+            }
+            _ => (),
+        }
+        core.transferred = true;
+    }
+    match inst[1].lower() {
+        0 => 4,
+        1 => 6,
+        2 => 10,
+        _ => 0,
+    }
 }
 
-pub fn i_r(inst: &[u8], core: &mut Vcore) -> u64 {
-    1
+pub fn i_r(_inst: &[u8], core: &mut Vcore) -> u64 {
+    core.regs.ip = core.regs.ipdump;
+    0
 }
 
 pub fn i_loop(inst: &[u8], core: &mut Vcore) -> u64 {
+    if core.regs.x[inst[1] as usize] != 0 {
+        let target = (inst[2] as u32)
+            | ((inst[3] as u32) << 8)
+            | ((inst[4] as u32) << 16)
+            | ((inst[5] as u32) << 24);
+        let target = if target & (1 << 31) != 0 {
+            -(target as i32)
+        } else {
+            target as i32
+        } as i64 as u64;
+        core.regs.ip = target;
+        core.transferred = true;
+    }
     6
 }
 
 pub fn i_ir(inst: &[u8], core: &mut Vcore) -> u64 {
-    2
+    if !core.privilege_test() {
+        return 0;
+    }
+    if inst[1] == 0 {
+        core.reset();
+    } else if inst[1] == 1 {
+        core.regs.ip = core.regs.ipdump;
+        core.regs.flag = core.regs.flagdump;
+        core.transferred = true;
+    } else {
+        core.intctler.interrupt(InterruptId::InvalidInstruction);
+    }
+    0
 }
 
-pub fn i_sysc(inst: &[u8], core: &mut Vcore) -> u64 {
+pub fn i_sysc(_inst: &[u8], core: &mut Vcore) -> u64 {
+    core.regs.ipdump = core.regs.ip;
+    core.regs.flagdump = core.regs.flag;
+    core.regs.ip = core.regs.scp;
+    core.regs.flag.bit_reset(FlagRegFlag::Privilege);
+    0
+}
+
+pub fn i_sysr(_inst: &[u8], core: &mut Vcore) -> u64 {
+    if !core.privilege_test() {
+        return 0;
+    }
+    core.regs.ip = core.regs.ipdump;
+    core.regs.flag = core.regs.flagdump;
     1
 }
 
-pub fn i_sysr(inst: &[u8], core: &mut Vcore) -> u64 {
-    1
-}
-
-pub fn i_1b(inst: &[u8], core: &mut Vcore) -> u64 {
+pub fn i_1b(_inst: &[u8], _core: &mut Vcore) -> u64 {
     0
 }
 
 pub fn i_ldi(inst: &[u8], core: &mut Vcore) -> u64 {
-    10
+    let reg_before = core.regs.x[inst[1].higher() as usize];
+    match inst[1].lower() {
+        0 => {
+            let imm = inst[2];
+            core.regs.x[inst[1].higher() as usize] = imm as u64;
+        }
+        1 => {
+            let imm = (inst[2] as u16) | ((inst[3] as u16) << 8);
+            core.regs.x[inst[1].higher() as usize] = imm as u64;
+        }
+        2 => {
+            let imm = (inst[2] as u32)
+                | ((inst[3] as u32) << 8)
+                | ((inst[4] as u32) << 16)
+                | ((inst[5] as u32) << 24);
+            core.regs.x[inst[1].higher() as usize] = imm as u64;
+        }
+        3 => {
+            let imm = (inst[2] as u64)
+                | ((inst[3] as u64) << 8)
+                | ((inst[4] as u64) << 16)
+                | ((inst[5] as u64) << 24)
+                | ((inst[6] as u64) << 32)
+                | ((inst[7] as u64) << 40)
+                | ((inst[8] as u64) << 48)
+                | ((inst[9] as u64) << 56);
+            core.regs.x[inst[1].higher() as usize] = imm as u64;
+        }
+        _ => (),
+    }
+    core.regs
+        .flag
+        .mark_symbol(reg_before, core.regs.x[inst[1].higher() as usize]);
+    core.regs.flag.bit_reset(FlagRegFlag::Overflow);
+    match inst[1].lower() {
+        0 => 3,
+        1 => 4,
+        2 => 6,
+        3 => 10,
+        _ => 0,
+    }
 }
 
 pub fn i_ldm(inst: &[u8], core: &mut Vcore) -> u64 {
+    let src = core.regs.x[inst[1].lower() as usize];
+    let src = core.memory().borrow().borrow().slice(src, 8);
+    let src = (src[0] as u64)
+        | ((src[1] as u64) << 8)
+        | ((src[2] as u64) << 16)
+        | ((src[3] as u64) << 24)
+        | ((src[4] as u64) << 32)
+        | ((src[5] as u64) << 40)
+        | ((src[6] as u64) << 48)
+        | ((src[7] as u64) << 56);
+    match inst[2] {
+        0 => {
+            let src = src as u8;
+            core.regs.x[inst[1].higher() as usize] = src as u64;
+        }
+        1 => {
+            let src = src as u16;
+            core.regs.x[inst[1].higher() as usize] = src as u64;
+        }
+        2 => {
+            let src = src as u32;
+            core.regs.x[inst[1].higher() as usize] = src as u64;
+        }
+        3 => {
+            core.regs.x[inst[1].higher() as usize] = src;
+        }
+        _ => (),
+    };
+    core.regs.flag.mark_symbol(src, src);
     3
 }
 
 pub fn i_stm(inst: &[u8], core: &mut Vcore) -> u64 {
+    let mut src = core.regs.x[inst[1].lower() as usize];
+    let src = match inst[2] {
+        0 => vec![(src & 0xff) as u8],
+        1 => {
+            let mut v = Vec::new();
+            for _ in 0..2 {
+                v.push((src & 0xff) as u8);
+                src >>= 8;
+            }
+            v
+        }
+        2 => {
+            let mut v = Vec::new();
+            for _ in 0..4 {
+                v.push((src & 0xff) as u8);
+                src >>= 8;
+            }
+            v
+        }
+        3 => {
+            let mut v = Vec::new();
+            for _ in 0..8 {
+                v.push((src & 0xff) as u8);
+                src >>= 8;
+            }
+            v
+        }
+        _ => vec![],
+    };
+    core.memory()
+        .borrow_mut()
+        .borrow_mut()
+        .write_slice(core.regs.x[inst[1].higher() as usize], &src);
+    core.regs.flag.mark_symbol(
+        core.regs.x[inst[1].lower() as usize],
+        core.regs.x[inst[1].lower() as usize],
+    );
     3
 }
 
-pub fn i_mv(inst: &[u8], core: &mut Vcore) -> u64 {
-    3
+pub fn i_1f(inst: &[u8], core: &mut Vcore) -> u64 {
+    0
 }
 
 pub fn i_in(inst: &[u8], core: &mut Vcore) -> u64 {
+    todo!();
     3
 }
 
 pub fn i_out(inst: &[u8], core: &mut Vcore) -> u64 {
+    todo!();
     3
 }
 
@@ -648,55 +859,121 @@ pub fn i_2f(inst: &[u8], core: &mut Vcore) -> u64 {
     0
 }
 
-pub fn i_ei(inst: &[u8], core: &mut Vcore) -> u64 {
+pub fn i_ei(_inst: &[u8], core: &mut Vcore) -> u64 {
+    if !core.privilege_test() {
+        return 0;
+    }
+    core.regs.flag.bit_set(FlagRegFlag::InterruptEnabled);
     1
 }
 
-pub fn i_di(inst: &[u8], core: &mut Vcore) -> u64 {
+pub fn i_di(_inst: &[u8], core: &mut Vcore) -> u64 {
+    if !core.privilege_test() {
+        return 0;
+    }
+    core.regs.flag.bit_reset(FlagRegFlag::InterruptEnabled);
     1
 }
 
-pub fn i_ep(inst: &[u8], core: &mut Vcore) -> u64 {
+pub fn i_ep(_inst: &[u8], core: &mut Vcore) -> u64 {
+    if !core.privilege_test() {
+        return 0;
+    }
+    core.regs.flag.bit_set(FlagRegFlag::PagingEnabled);
     1
 }
 
-pub fn i_dp(inst: &[u8], core: &mut Vcore) -> u64 {
+pub fn i_dp(_inst: &[u8], core: &mut Vcore) -> u64 {
+    if !core.privilege_test() {
+        return 0;
+    }
+    core.regs.flag.bit_reset(FlagRegFlag::PagingEnabled);
     1
 }
 
 pub fn i_livt(inst: &[u8], core: &mut Vcore) -> u64 {
+    if !core.privilege_test() {
+        return 0;
+    }
+    core.regs.ivt = core.regs.x[inst[1].lower() as usize];
     2
 }
 
 pub fn i_lkpt(inst: &[u8], core: &mut Vcore) -> u64 {
+    if !core.privilege_test() {
+        return 0;
+    }
+    core.regs.kpt = core.regs.x[inst[1].lower() as usize];
     2
 }
 
 pub fn i_lupt(inst: &[u8], core: &mut Vcore) -> u64 {
+    if !core.privilege_test() {
+        return 0;
+    }
+    core.regs.upt = core.regs.x[inst[1].lower() as usize];
     2
 }
 
 pub fn i_lscp(inst: &[u8], core: &mut Vcore) -> u64 {
+    if !core.privilege_test() {
+        return 0;
+    }
+    core.regs.scp = core.regs.x[inst[1].lower() as usize];
     2
 }
 
 pub fn i_lipdump(inst: &[u8], core: &mut Vcore) -> u64 {
+    core.regs.ipdump = core.regs.x[inst[1].lower() as usize];
     2
 }
 
 pub fn i_lflagdump(inst: &[u8], core: &mut Vcore) -> u64 {
+    core.regs.flagdump = core.regs.x[inst[1].lower() as usize];
     2
 }
 
 pub fn i_sipdump(inst: &[u8], core: &mut Vcore) -> u64 {
+    core.regs.x[inst[1].lower() as usize] = core.regs.ipdump;
     2
 }
 
 pub fn i_sflagdump(inst: &[u8], core: &mut Vcore) -> u64 {
+    core.regs.x[inst[1].lower() as usize] = core.regs.flagdump;
     2
 }
 
 pub fn i_cpuid(inst: &[u8], core: &mut Vcore) -> u64 {
+    match core.regs.x[0] {
+        0 => {
+            // 52 57 53 20 56 72 69 73 | 63 20 56 63 6F 72 65 20 | 30 2E 30 2E 31
+            // RWS Vrisc Vcore 0.0.1
+            core.regs.x[0] = 0x7369_7256_2053_5752;
+            core.regs.x[1] = 0x2065_726f_6356_2063;
+            core.regs.x[2] = 0x0000_0031_2e30_2e30;
+            core.regs.x[3] = 0x0000_0000_0000_0000;
+        }
+        1 => {
+            core.regs.x[0] = core.total_core() as u64;
+        }
+        2 => {
+            core.regs.x[0] = core.id() as u64;
+        }
+        3 => {
+            let mut i = 0usize;
+            let tar = core.regs.x[1];
+            while *core.memory().borrow().borrow().at(tar + i as u64) != 0 {
+                i += 1;
+            }
+            let s = core.memory().borrow().borrow().slice(tar, i as u64);
+            let s = String::from_utf8_lossy(s).to_string();
+            println!("{}", s);
+        }
+        4 => {
+            core.regs.x[0] = 1;
+        }
+        _ => (),
+    }
     1
 }
 
