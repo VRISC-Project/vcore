@@ -24,14 +24,15 @@ impl<T> SharedPointer<T> {
     pub fn new(name: String, size: usize) -> Result<Self, Errno> {
         let fd = sys::mman::shm_open(
             ("/".to_string() + &name.to_string()).as_str(),
-            OFlag::O_RDWR & OFlag::O_CREAT,
-            Mode::S_IRWXU,
+            OFlag::O_RDWR | OFlag::O_CREAT,
+            Mode::S_IRUSR | Mode::S_IWUSR ,
         )?;
+        unistd::ftruncate(fd, size as i64)?;
         let addr = unsafe {
             sys::mman::mmap(
                 None,
                 size.try_into().unwrap(),
-                ProtFlags::PROT_READ & ProtFlags::PROT_WRITE,
+                ProtFlags::PROT_READ | ProtFlags::PROT_WRITE,
                 MapFlags::MAP_SHARED,
                 fd,
                 0,
@@ -46,7 +47,11 @@ impl<T> SharedPointer<T> {
     }
 
     pub fn bind(name: String, size: usize) -> Result<Self, Errno> {
-        let fd = sys::mman::shm_open(name.as_str(), OFlag::O_RDWR & OFlag::O_EXCL, Mode::S_IRWXU)?;
+        let fd = sys::mman::shm_open(
+            name.as_str(),
+            OFlag::O_RDWR | OFlag::O_EXCL,
+            Mode::S_IRUSR | Mode::S_IWUSR,
+        )?;
         let addr = unsafe {
             sys::mman::mmap(
                 None,
