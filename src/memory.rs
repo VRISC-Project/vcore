@@ -19,6 +19,12 @@ impl Memory {
         }
     }
 
+    pub fn bind(memory: usize) -> Self {
+        Memory {
+            memory: SharedPointer::bind("VcoreVriscMainMemory".to_string(), memory).unwrap(),
+        }
+    }
+
     pub fn borrow(&self) -> &SharedPointer<u8> {
         &self.memory
     }
