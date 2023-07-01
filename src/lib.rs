@@ -16,6 +16,8 @@ pub fn run(config: Config) {
     let mut cores_startflg = Vec::new();
     let mut cores_inst_count = Vec::new();
 
+    let memory = Memory::new(config.memory);
+
     for i in 0..config.cores {
         cores_startflg
             .push(SharedPointer::<bool>::new(format!("VcoreCore{}StartFlg", i), 1).unwrap());
@@ -50,7 +52,7 @@ fn vcore(memory_size: usize, id: usize, total_core: usize) {
     let mut core_instruction_count =
         SharedPointer::<u64>::bind(format!("VcoreCore{}InstCount", id), 1).unwrap();
 
-    let memory = Memory::new(memory_size);
+    let memory = Memory::bind(memory_size);
     let memory = Rc::new(RefCell::new(memory));
     let mut core = Vcore::new(id, total_core, Rc::clone(&memory));
 
