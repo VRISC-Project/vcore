@@ -29,7 +29,7 @@ pub fn run(config: Config) {
         match unsafe { unistd::fork().unwrap() } {
             unistd::ForkResult::Parent { child } => cores.push(child),
             unistd::ForkResult::Child => {
-                vcore(config.memory, i);
+                vcore(config.memory, i, config.cores);
                 break;
             }
         }
@@ -43,7 +43,7 @@ pub fn run(config: Config) {
     }
 }
 
-fn vcore(memory_size: usize, id: usize) {
+fn vcore(memory_size: usize, id: usize, total_core: usize) {
     let core_startflg = SharedPointer::<bool>::bind(format!("VcoreCore{}StartFlg", id), 1).unwrap();
     // 指令计数，计算从a开始运行到现在此核心共运行了多少条指令
     // 用于vcore父进程统计执行速度等
@@ -52,7 +52,7 @@ fn vcore(memory_size: usize, id: usize) {
 
     let memory = Memory::new(memory_size);
     let memory = Rc::new(RefCell::new(memory));
-    let mut core = Vcore::new(id, Rc::clone(&memory));
+    let mut core = Vcore::new(id, total_core, Rc::clone(&memory));
 
     while !core_startflg.at(0) {
         //等待核心被允许开始

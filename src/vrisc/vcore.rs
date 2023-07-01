@@ -220,6 +220,7 @@ impl InterruptController {
 
 pub struct Vcore {
     id: usize,
+    total: usize,
     pub regs: Registers,
     pub memory: Rc<RefCell<Memory>>,
     pub intctler: InterruptController,
@@ -229,9 +230,10 @@ pub struct Vcore {
 }
 
 impl Vcore {
-    pub fn new(id: usize, memory: Rc<RefCell<Memory>>) -> Self {
+    pub fn new(id: usize, total_core: usize, memory: Rc<RefCell<Memory>>) -> Self {
         Vcore {
             id,
+            total: total_core,
             regs: Registers::new(),
             memory,
             intctler: InterruptController::new(),
@@ -281,6 +283,10 @@ impl Vcore {
 
     pub fn id(&self) -> usize {
         self.id
+    }
+
+    pub fn total_core(&self) -> usize {
+        self.total
     }
 
     pub fn reset(&mut self) {
