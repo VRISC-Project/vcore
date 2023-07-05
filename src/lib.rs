@@ -22,7 +22,7 @@ pub fn run(config: Config) {
         cores_startflg
             .push(SharedPointer::<bool>::new(format!("VcoreCore{}StartFlg", i), 1).unwrap());
         cores_inst_count
-            .push(SharedPointer::<u64>::new(format!("VcoreCore{}InstCount", i), 1).unwrap());
+            .push(SharedPointer::<u64>::new(format!("VcoreCore{}InstCount", i), 8).unwrap());
 
         if i == 0 {
             //core0直接打开
@@ -82,7 +82,12 @@ fn vcore(memory_size: usize, id: usize, total_core: usize) {
 
     let mut crossed_page = false;
 
+    core_instruction_count.write(0, u64::MAX);
+
     loop {
+        let count = (*core_instruction_count.at(0)).wrapping_add(1);
+        core_instruction_count.write(0, count);
+
         if core.regs.flag.bit_get(FlagRegFlag::InterruptEnabled) {
             core.regs.ip += core.ip_increment as u64;
             core.interrupt_jump();
@@ -92,9 +97,9 @@ fn vcore(memory_size: usize, id: usize, total_core: usize) {
         }
         if core.transferred || hot_ip % (16 * 1024) == 0 || crossed_page {
             hot_ip = match core
-            .memory
-            .borrow_mut()
-            .address(core.regs.ip, core.regs.flag)
+                .memory
+                .borrow_mut()
+                .address(core.regs.ip, core.regs.flag)
             {
                 Ok(address) => address,
                 Err(error) => match error {
@@ -175,9 +180,5 @@ fn vcore(memory_size: usize, id: usize, total_core: usize) {
         let movement = core.instruction_space[opcode as usize].unwrap().0(inst, &mut core);
         core.ip_increment += movement as i64;
         hot_ip += movement;
-
-        let count = *core_instruction_count.at(0) + 1;
-        core_instruction_count.write(0, count);
-        println!("{}", count);
     }
 }
