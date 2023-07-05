@@ -1,4 +1,5 @@
 use core::slice;
+use std::num::NonZeroUsize;
 
 use nix::{
     errno::Errno,
@@ -12,7 +13,7 @@ use nix::{
 };
 
 pub struct SharedPointer<T> {
-    pointer: *mut T,
+    pub pointer: *mut T,
     size: usize,
     name: String,
     fd: i32,
@@ -22,16 +23,19 @@ pub struct SharedPointer<T> {
 /// 这个结构的`new`和`bind`函数中的参数`size`指申请的字节数，而不是泛型类型的实际大小的数量
 impl<T> SharedPointer<T> {
     pub fn new(name: String, size: usize) -> Result<Self, Errno> {
+        if size == 0 {
+            panic!("The memory you are allocating sizes 0.");
+        }
         let fd = sys::mman::shm_open(
-            ("/".to_string() + &name.to_string()).as_str(),
+            ("/".to_string() + &name).as_str(),
             OFlag::O_RDWR | OFlag::O_CREAT,
-            Mode::S_IRUSR | Mode::S_IWUSR ,
+            Mode::S_IRUSR | Mode::S_IWUSR,
         )?;
         unistd::ftruncate(fd, size as i64)?;
         let addr = unsafe {
             sys::mman::mmap(
                 None,
-                size.try_into().unwrap(),
+                NonZeroUsize::new_unchecked(size),
                 ProtFlags::PROT_READ | ProtFlags::PROT_WRITE,
                 MapFlags::MAP_SHARED,
                 fd,
@@ -39,7 +43,7 @@ impl<T> SharedPointer<T> {
             )?
         };
         Ok(SharedPointer {
-            pointer: addr.cast(),
+            pointer: addr as *mut T,
             size,
             name: name.to_string(),
             fd,
@@ -47,23 +51,26 @@ impl<T> SharedPointer<T> {
     }
 
     pub fn bind(name: String, size: usize) -> Result<Self, Errno> {
+        if size == 0 {
+            panic!("The memory you are allocating sizes 0.");
+        }
         let fd = sys::mman::shm_open(
-            name.as_str(),
+            ("/".to_string() + &name).as_str(),
             OFlag::O_RDWR | OFlag::O_EXCL,
-            Mode::S_IRUSR | Mode::S_IWUSR,
+            Mode::from_bits(0).unwrap(),
         )?;
         let addr = unsafe {
             sys::mman::mmap(
                 None,
-                size.try_into().unwrap(),
-                ProtFlags::PROT_READ & ProtFlags::PROT_WRITE,
+                NonZeroUsize::new_unchecked(size),
+                ProtFlags::PROT_READ | ProtFlags::PROT_WRITE,
                 MapFlags::MAP_SHARED,
                 fd,
                 0,
             )?
         };
         Ok(SharedPointer {
-            pointer: addr.cast(),
+            pointer: addr as *mut T,
             size,
             name: name.to_string(),
             fd,
@@ -95,11 +102,11 @@ impl<T> SharedPointer<T> {
     }
 
     pub fn at<'a>(&self, addr: u64) -> &'a T {
-        unsafe { ((self.pointer as u64 + addr) as *mut T).as_ref() }.unwrap()
+        unsafe { &*((self.pointer as u64 + addr) as *const T) }
     }
 
     pub fn at_mut<'a>(&self, addr: u64) -> &'a mut T {
-        unsafe { ((self.pointer as u64 + addr) as *mut T).as_mut() }.unwrap()
+        unsafe { &mut *((self.pointer as u64 + addr) as *mut T) }
     }
 
     pub fn write(&mut self, addr: u64, t: T) {

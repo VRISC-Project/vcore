@@ -27,6 +27,7 @@ pub fn run(config: Config) {
         if i == 0 {
             //core0直接打开
             cores_startflg[0].write(0, true);
+            println!("core{} opening.", i);
         }
         match unsafe { unistd::fork().unwrap() } {
             unistd::ForkResult::Parent { child } => cores.push(child),
@@ -42,6 +43,7 @@ pub fn run(config: Config) {
     // TODO
     loop {
         thread::sleep(Duration::from_secs(1));
+        println!("{}", *cores_inst_count[0].at(0));
     }
 }
 
@@ -56,10 +58,11 @@ fn vcore(memory_size: usize, id: usize, total_core: usize) {
     let memory = Rc::new(RefCell::new(memory));
     let mut core = Vcore::new(id, total_core, Rc::clone(&memory));
 
-    while !core_startflg.at(0) {
+    while !*core_startflg.at(0) {
         //等待核心被允许开始
         thread::sleep(Duration::from_millis(1));
     }
+    println!("core{} started.", id);
 
     /*
     hot_ip时栈上储存的ip寄存器的寻址后值，只有这个值每运行一次指令改变一次。
@@ -89,9 +92,9 @@ fn vcore(memory_size: usize, id: usize, total_core: usize) {
         }
         if core.transferred || hot_ip % (16 * 1024) == 0 || crossed_page {
             hot_ip = match core
-                .memory
-                .borrow_mut()
-                .address(core.regs.ip, core.regs.flag)
+            .memory
+            .borrow_mut()
+            .address(core.regs.ip, core.regs.flag)
             {
                 Ok(address) => address,
                 Err(error) => match error {
@@ -175,5 +178,6 @@ fn vcore(memory_size: usize, id: usize, total_core: usize) {
 
         let count = *core_instruction_count.at(0) + 1;
         core_instruction_count.write(0, count);
+        println!("{}", count);
     }
 }
