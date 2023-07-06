@@ -255,8 +255,8 @@ impl Vcore {
     ip跳转
     中断控制器复位
     */
-    pub fn interrupt_jump(&mut self) {
-        if let Some(intid) = self.intctler.interrupted() {
+    pub fn interrupt_jump(&mut self, intid: InterruptId) {
+        if self.regs.flag.bit_get(FlagRegFlag::InterruptEnabled) {
             self.regs.flagdump = self.regs.flag;
             self.regs.ipdump = self.regs.ip;
             self.regs.flag.bit_reset(FlagRegFlag::InterruptEnabled);
@@ -274,6 +274,8 @@ impl Vcore {
             self.regs.ip = addr;
             self.intctler.intflag = false;
             self.transferred = true;
+
+            self.regs.ip += self.ip_increment as u64;
         }
     }
 

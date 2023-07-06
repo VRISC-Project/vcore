@@ -85,13 +85,18 @@ fn vcore(memory_size: usize, id: usize, total_core: usize) {
     core_instruction_count.write(0, u64::MAX);
 
     loop {
+        // 更新指令计数
         let count = (*core_instruction_count.at(0)).wrapping_add(1);
         core_instruction_count.write(0, count);
 
-        if core.regs.flag.bit_get(FlagRegFlag::InterruptEnabled) {
-            core.regs.ip += core.ip_increment as u64;
-            core.interrupt_jump();
+        // 检测中断
+        if let Some(intid) = core.intctler.interrupted() {
+            core.interrupt_jump(intid);
         }
+
+        // 这块代码跟前面注释不相符
+        // 记得改
+        // TODO
         if !core.transferred && hot_ip % (16 * 1024) == 0 {
             core.regs.ip = hot_ip;
         }
@@ -117,6 +122,7 @@ fn vcore(memory_size: usize, id: usize, total_core: usize) {
             };
             crossed_page = false;
         }
+
         /* 取指令 */
         let opcode = *core.memory.borrow().borrow().at(hot_ip);
         // 这里有个例外
@@ -141,8 +147,10 @@ fn vcore(memory_size: usize, id: usize, total_core: usize) {
             let inst_st = hot_ip; //最后14位为0
             let inst_end = hot_ip + instlen;
             if inst_st & 0xffff_ffff_ffff_c000 == inst_end & 0xffff_ffff_ffff_c000 {
+                //指令未跨页
                 core.memory().borrow().borrow().slice(hot_ip, instlen)
             } else {
+                //指令跨页
                 let firstl = inst_end & 0xffff_ffff_ffff_c000 - inst_st;
                 let lastl = inst_end - inst_end & 0xffff_ffff_ffff_c000;
                 inst.copy_from_slice(core.memory().borrow().borrow().slice(inst_st, firstl));
@@ -177,6 +185,7 @@ fn vcore(memory_size: usize, id: usize, total_core: usize) {
                 inst.as_slice()
             }
         };
+        /* 执行指令 */
         let movement = core.instruction_space[opcode as usize].unwrap().0(inst, &mut core);
         core.ip_increment += movement as i64;
         hot_ip += movement;
