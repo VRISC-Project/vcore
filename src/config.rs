@@ -1,53 +1,26 @@
-pub struct Config {
-    pub cores: usize,          //核心数量
-    pub memory: usize,         //内存大小
-    pub firmware_file: String, //固件代码文件
-    pub debug: bool,           //是否开启调试
-    pub clock: bool,           //是否开启外部时钟
-}
+use clap::Parser;
 
-impl Config {
-    pub fn new() -> Config {
-        let mut config = Config {
-            cores: 1,
-            memory: 0,
-            firmware_file: String::from(""),
-            debug: false,
-            clock: false,
-        };
-        let mut iterator = std::env::args().into_iter();
-        let _ = iterator.next(); //第一个参数是可执行文件名，直接跳过
-        while let Some(arg) = iterator.next() {
-            match arg.as_str() {
-                "-m" => {
-                    let arg = if let Some(some) = iterator.next() {
-                        some
-                    } else {
-                        break;
-                    };
-                    config.memory = arg.parse().expect("A number after \"-m\" is excepted.");
-                }
-                "-c" => {
-                    let arg = if let Some(some) = iterator.next() {
-                        some
-                    } else {
-                        break;
-                    };
-                    config.cores = arg.parse().expect("A number after \"-c\" is excepted.");
-                }
-                "-b" => {
-                    let arg = if let Some(some) = iterator.next() {
-                        some
-                    } else {
-                        break;
-                    };
-                    config.firmware_file = arg;
-                }
-                "-d" => config.debug = true,
-                "-t" => config.clock = true,
-                _ => panic!("Unknown option {}", arg),
-            }
-        }
-        config
-    }
+/// 基于vrisc指令集的虚拟机
+#[derive(Parser, Debug)]
+#[command(author, version, about, long_about = None)]
+pub struct Config {
+    /// 核心数量
+    #[arg(short, long, default_value_t = 1)]
+    pub cores: usize,
+
+    ///内存大小
+    #[arg(short, long)]
+    pub memory: usize,
+
+    ///固件代码文件
+    #[arg(short, long)]
+    pub firmware_file: String,
+
+    ///是否开启调试
+    #[arg(short, long, default_value_t = false)]
+    pub debug: bool,
+
+    ///是否开启外部时钟
+    #[arg(short, long, default_value_t = false)]
+    pub external_clock: bool,
 }
