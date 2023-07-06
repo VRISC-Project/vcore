@@ -9,7 +9,7 @@ use config::Config;
 use memory::Memory;
 use nix::unistd;
 use utils::shared::SharedPointer;
-use vrisc::vcore::{BitOptions, FlagRegFlag, InterruptId, Vcore};
+use vrisc::vcore::{InterruptId, Vcore};
 
 pub fn run(config: Config) {
     let mut cores = Vec::new();
@@ -43,7 +43,6 @@ pub fn run(config: Config) {
     // TODO
     loop {
         thread::sleep(Duration::from_secs(1));
-        println!("{}", *cores_inst_count[0].at(0));
     }
 }
 
@@ -57,6 +56,7 @@ fn vcore(memory_size: usize, id: usize, total_core: usize) {
     let memory = Memory::bind(memory_size);
     let memory = Rc::new(RefCell::new(memory));
     let mut core = Vcore::new(id, total_core, Rc::clone(&memory));
+    core.init();
 
     while !*core_startflg.at(0) {
         //等待核心被允许开始
@@ -131,6 +131,7 @@ fn vcore(memory_size: usize, id: usize, total_core: usize) {
         // 现在这两个指令依然会产生InvalidInstruction
         // TODO
         // 添加指令执行内容需在base.rs中实现，并加入到指令空间中
+        println!("{}", opcode);
         if let None = core.instruction_space[opcode as usize] {
             core.intctler.interrupt(InterruptId::InvalidInstruction);
             continue;

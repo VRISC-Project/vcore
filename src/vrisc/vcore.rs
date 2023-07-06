@@ -244,7 +244,7 @@ impl Vcore {
     }
 
     pub fn init(&mut self) {
-        self.instruction_space.copy_from_slice(&base::BASE)
+        self.instruction_space[..64].copy_from_slice(&base::BASE);
     }
 
     /*中断跳转
