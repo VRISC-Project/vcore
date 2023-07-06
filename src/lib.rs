@@ -94,11 +94,10 @@ fn vcore(memory_size: usize, id: usize, total_core: usize) {
             core.interrupt_jump(intid);
         }
 
-        // 这块代码跟前面注释不相符
-        // 记得改
-        // TODO
+        // 指令寻址，更新hot_ip
         if !core.transferred && hot_ip % (16 * 1024) == 0 {
-            core.regs.ip = hot_ip;
+            core.regs.ip += core.ip_increment as u64;
+            core.ip_increment = 0;
         }
         if core.transferred || hot_ip % (16 * 1024) == 0 || crossed_page {
             hot_ip = match core
@@ -146,7 +145,9 @@ fn vcore(memory_size: usize, id: usize, total_core: usize) {
             core.regs.ip += core.ip_increment as u64; //恰好在此更新core.regs.ip，寻址失败可以在此中断
             let inst_st = hot_ip; //最后14位为0
             let inst_end = hot_ip + instlen;
-            if inst_st & 0xffff_ffff_ffff_c000 == inst_end & 0xffff_ffff_ffff_c000 {
+            if inst_st & 0xffff_ffff_ffff_c000 == inst_end & 0xffff_ffff_ffff_c000
+                || inst_end == inst_end & 0xffff_ffff_ffff_c000
+            {
                 //指令未跨页
                 core.memory().borrow().borrow().slice(hot_ip, instlen)
             } else {
