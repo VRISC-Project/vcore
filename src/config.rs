@@ -12,9 +12,9 @@ pub struct Config {
     #[arg(short, long)]
     pub memory: usize,
 
-    /// 固件代码文件
+    /// 虚拟ROM文件
     #[arg(short, long)]
-    pub firmware_file: String,
+    pub vrom: String,
 
     /// 是否开启调试
     #[arg(short, long, default_value_t = false)]
