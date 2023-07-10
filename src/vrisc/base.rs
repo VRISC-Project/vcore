@@ -795,12 +795,10 @@ pub fn i_1f(_inst: &[u8], _core: &mut Vcore) -> u64 {
 
 pub fn i_in(_inst: &[u8], _core: &mut Vcore) -> u64 {
     todo!();
-    3
 }
 
 pub fn i_out(_inst: &[u8], _core: &mut Vcore) -> u64 {
     todo!();
-    3
 }
 
 pub fn i_22(_inst: &[u8], _core: &mut Vcore) -> u64 {
