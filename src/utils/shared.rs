@@ -1,5 +1,5 @@
 use core::slice;
-use std::num::NonZeroUsize;
+use std::{mem::size_of, num::NonZeroUsize};
 
 use nix::{
     errno::Errno,
@@ -11,6 +11,11 @@ use nix::{
     },
     unistd,
 };
+
+#[derive(Debug)]
+pub enum AssignError {
+    IndexOutOfSize,
+}
 
 pub struct SharedPointer<T> {
     pub pointer: *mut T,
@@ -76,6 +81,19 @@ impl<T> SharedPointer<T> {
             fd,
         })
     }
+
+    pub fn assign(&mut self, index: usize, t: T) -> Result<(), AssignError> {
+        if index * size_of::<T>() > self.size {
+            return Err(AssignError::IndexOutOfSize);
+        }
+        let p = &t as *const T as *const u8;
+        unsafe {
+            for i in 0..size_of::<T>() {
+                *(self.pointer.add(index * size_of::<T>() + i) as *mut u8) = *p.add(i);
+            }
+        };
+        Ok(())
+    }
 }
 
 impl<T> Drop for SharedPointer<T> {
@@ -91,7 +109,7 @@ impl<T> SharedPointer<T> {
         if (addr + len) as usize > self.size {
             len = self.size as u64 - addr;
         }
-        unsafe { slice::from_raw_parts((self.pointer as u64 + addr) as *mut T, len as usize) }
+        unsafe { slice::from_raw_parts(self.pointer.add(addr as usize), len as usize) }
     }
 
     pub fn slice_mut<'a>(&self, addr: u64, mut len: u64) -> &'a mut [T] {
@@ -102,22 +120,26 @@ impl<T> SharedPointer<T> {
     }
 
     pub fn at<'a>(&self, addr: u64) -> &'a T {
-        unsafe { &*((self.pointer as u64 + addr) as *const T) }
+        unsafe { &*self.pointer.add(addr as usize) }
     }
 
     pub fn at_mut<'a>(&self, addr: u64) -> &'a mut T {
-        unsafe { &mut *((self.pointer as u64 + addr) as *mut T) }
+        unsafe { &mut *self.pointer.add(addr as usize) }
     }
 
     pub fn write(&mut self, addr: u64, t: T) {
         if (addr as usize) < self.size {
-            unsafe { *((self.pointer as u64 + addr) as *mut T) = t };
+            unsafe { *self.pointer.add(addr as usize) = t };
         }
     }
 
     pub fn write_slice(&mut self, addr: u64, s: &[T]) {
         if addr as usize + s.len() < self.size {
-            unsafe { ((self.pointer as u64 + addr) as *mut T).copy_from(s.as_ptr(), s.len()) };
+            unsafe {
+                self.pointer
+                    .add(addr as usize)
+                    .copy_from(s.as_ptr(), s.len())
+            };
         }
     }
 }
