@@ -5,7 +5,7 @@ fn main() {
     let config = Config::parse();
     println!(
         "vcore
-(c)Copysight Random World Studio 2023. All rights served."
+(c)Copyright Random World Studio 2023. All rights served."
     );
     vcore::run(config);
 }

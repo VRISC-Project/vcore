@@ -1,5 +1,3 @@
-use std::{thread, time::Duration};
-
 use super::vcore::{BitOptions, ConditionCode, FlagRegFlag, InterruptId, Vcore, VcoreInstruction};
 
 pub const BASE: [Option<VcoreInstruction>; 64] = [
@@ -92,12 +90,7 @@ impl Oprand for u8 {
 // TODO
 
 pub fn i_nop(_inst: &[u8], core: &mut Vcore) -> u64 {
-    loop {
-        thread::sleep(Duration::from_millis(1));
-        if let Some(_) = core.intctler.interrupted() {
-            break;
-        }
-    }
+    core.nopflag = true;
     1
 }
 

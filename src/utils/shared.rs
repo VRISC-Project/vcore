@@ -36,11 +36,11 @@ impl<T> SharedPointer<T> {
             OFlag::O_RDWR | OFlag::O_CREAT,
             Mode::S_IRUSR | Mode::S_IWUSR,
         )?;
-        unistd::ftruncate(fd, size as i64)?;
+        unistd::ftruncate(fd, (size * size_of::<T>()) as i64)?;
         let addr = unsafe {
             sys::mman::mmap(
                 None,
-                NonZeroUsize::new_unchecked(size),
+                NonZeroUsize::new_unchecked(size * size_of::<T>()),
                 ProtFlags::PROT_READ | ProtFlags::PROT_WRITE,
                 MapFlags::MAP_SHARED,
                 fd,
@@ -50,7 +50,7 @@ impl<T> SharedPointer<T> {
         Ok(SharedPointer {
             pointer: addr as *mut T,
             size,
-            name: name.to_string(),
+            name,
             fd,
         })
     }
@@ -67,7 +67,7 @@ impl<T> SharedPointer<T> {
         let addr = unsafe {
             sys::mman::mmap(
                 None,
-                NonZeroUsize::new_unchecked(size),
+                NonZeroUsize::new_unchecked(size * size_of::<T>()),
                 ProtFlags::PROT_READ | ProtFlags::PROT_WRITE,
                 MapFlags::MAP_SHARED,
                 fd,
@@ -77,7 +77,7 @@ impl<T> SharedPointer<T> {
         Ok(SharedPointer {
             pointer: addr as *mut T,
             size,
-            name: name.to_string(),
+            name,
             fd,
         })
     }
@@ -100,7 +100,10 @@ impl<T> Drop for SharedPointer<T> {
     fn drop(&mut self) {
         unsafe { sys::mman::munmap(self.pointer.cast(), self.size).unwrap() };
         unistd::close(self.fd).unwrap();
-        sys::mman::shm_unlink(self.name.as_str()).unwrap();
+        // 写了这句会出现'ENOENT'错误
+        // 不写这句会有小概率会在下次运行申请共享内存时发生'ENOENT'，
+        // 没搞懂是怎么回事，不过先注释上目前没啥大毛病
+        // sys::mman::shm_unlink(("/".to_string() + &self.name).as_str()).unwrap();
     }
 }
 
@@ -147,5 +150,9 @@ impl<T> SharedPointer<T> {
 impl<T> SharedPointer<T> {
     pub fn size(&self) -> usize {
         self.size
+    }
+
+    pub fn name(&self) -> &str {
+        &self.name
     }
 }

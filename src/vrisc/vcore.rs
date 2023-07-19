@@ -114,6 +114,7 @@ impl BitOptions for u64 {
     }
 }
 
+#[derive(PartialEq, Clone, Copy)]
 pub struct Registers {
     pub x: [u64; 16],
     pub ip: u64,
@@ -227,6 +228,7 @@ pub struct Vcore {
     pub ip_increment: i64,
     pub instruction_space: [Option<VcoreInstruction>; 256],
     pub transferred: bool,
+    pub nopflag: bool,
 }
 
 impl Vcore {
@@ -240,6 +242,7 @@ impl Vcore {
             ip_increment: 0,
             instruction_space: [None; 256],
             transferred: true,
+            nopflag: false,
         }
     }
 
@@ -276,6 +279,8 @@ impl Vcore {
             self.transferred = true;
 
             self.regs.ip += self.ip_increment as u64;
+
+            self.nopflag = false;
         }
     }
 

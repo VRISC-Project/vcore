@@ -1,66 +1,134 @@
 pub mod config;
+pub mod debug;
 pub mod memory;
 pub mod utils;
 pub mod vrisc;
 
-use std::{cell::RefCell, rc::Rc, thread, time::Duration};
+use std::{
+    cell::RefCell,
+    io::{BufRead, Write},
+    process::exit,
+    rc::Rc,
+    thread,
+    time::Duration,
+};
 
 use config::Config;
+use debug::VdbApi;
 use memory::Memory;
 use nix::unistd;
 use utils::shared::SharedPointer;
 use vrisc::vcore::{InterruptId, Vcore};
 
+use crate::debug::command_line;
+
 pub fn run(config: Config) {
     let mut cores = Vec::new();
     let mut cores_startflg = Vec::new();
     let mut cores_inst_count = Vec::new();
+    let mut cores_debug_port = Vec::new();
 
-    let memory = Memory::new(config.memory);
+    let mut memory = Memory::new(config.memory);
 
     for i in 0..config.cores {
         cores_startflg
             .push(SharedPointer::<bool>::new(format!("VcoreCore{}StartFlg", i), 1).unwrap());
         cores_inst_count
-            .push(SharedPointer::<u64>::new(format!("VcoreCore{}InstCount", i), 8).unwrap());
+            .push(SharedPointer::<u64>::new(format!("VcoreCore{}InstCount", i), 1).unwrap());
+        cores_debug_port
+            .push(SharedPointer::<VdbApi>::new(format!("VcoreCore{}DebugApi", i), 1).unwrap());
+        cores_debug_port[i].write(0, VdbApi::None);
 
         if i == 0 {
             //core0直接打开
-            cores_startflg[0].write(0, true);
+            cores_startflg[i].write(0, true);
             println!("core{} opening.", i);
+        } else {
+            cores_startflg[i].write(0, false);
         }
         match unsafe { unistd::fork().unwrap() } {
             unistd::ForkResult::Parent { child } => cores.push(child),
             unistd::ForkResult::Child => {
-                vcore(config.memory, i, config.cores);
-                break;
+                vcore(config.memory, i, config.cores, config.debug);
+                exit(0);
             }
         }
     }
-    // 这里父进程不能浪费了
-    // 等基本功能开发好后
-    // 这里将运行debugger
-    // TODO
+
+    let mut stdin = std::io::BufReader::new(std::io::stdin());
+    let mut stdout = std::io::BufWriter::new(std::io::stdout());
+    if config.debug {
+        for db in cores_debug_port.as_mut_slice() {
+            while *db.at(0) != VdbApi::Initialized {}
+        }
+        print!("\n\x1b[34mvdb >\x1b[0m ");
+        stdout.flush().unwrap();
+    }
     loop {
-        thread::sleep(Duration::from_secs(1));
+        thread::sleep(Duration::from_micros(1));
+        if config.debug {
+            if let Some(cmd) = {
+                let buffer = stdin.fill_buf().unwrap();
+                if buffer.len() == 0 {
+                    None
+                } else {
+                    let mut cmd = String::new();
+                    stdin.read_line(&mut cmd).unwrap();
+                    Some(cmd.trim().to_string())
+                }
+            } {
+                let result = command_line(&cmd, &mut memory, &mut cores_debug_port);
+                if !result.is_empty() {
+                    println!("{}", result);
+                }
+                if result == "exit" {
+                    for db in cores_debug_port.as_mut_slice() {
+                        db.at_mut(0).get_result(VdbApi::Exit);
+                    }
+                    break;
+                }
+                print!("\x1b[34mvdb >\x1b[0m ");
+                stdout.flush().unwrap();
+            }
+        }
     }
 }
 
-fn vcore(memory_size: usize, id: usize, total_core: usize) {
-    let core_startflg = SharedPointer::<bool>::bind(format!("VcoreCore{}StartFlg", id), 1).unwrap();
+fn vcore(memory_size: usize, id: usize, total_core: usize, debug: bool) {
+    let mut core_startflg =
+        SharedPointer::<bool>::bind(format!("VcoreCore{}StartFlg", id), 1).unwrap();
     // 指令计数，计算从a开始运行到现在此核心共运行了多少条指令
     // 用于vcore父进程统计执行速度等
     let mut core_instruction_count =
         SharedPointer::<u64>::bind(format!("VcoreCore{}InstCount", id), 1).unwrap();
+    let core_debug_port =
+        SharedPointer::<VdbApi>::bind(format!("VcoreCore{}DebugApi", id), 1).unwrap();
 
     let memory = Memory::bind(memory_size);
     let memory = Rc::new(RefCell::new(memory));
     let mut core = Vcore::new(id, total_core, Rc::clone(&memory));
     core.init();
 
+    if debug {
+        *core_debug_port.at_mut(0) = VdbApi::Initialized;
+    }
+
     while !*core_startflg.at(0) {
         //等待核心被允许开始
         thread::sleep(Duration::from_millis(1));
+
+        if debug {
+            match *core_debug_port.at(0) {
+                VdbApi::StartCore => {
+                    core_startflg.write(0, true);
+                    *core_debug_port.at_mut(0) = VdbApi::Ok;
+                }
+                VdbApi::Exit => {
+                    return;
+                }
+                _ => *core_debug_port.at_mut(0) = VdbApi::NotRunning,
+            }
+        }
     }
     println!("core{} started.", id);
 
@@ -85,6 +153,19 @@ fn vcore(memory_size: usize, id: usize, total_core: usize) {
     core_instruction_count.write(0, u64::MAX);
 
     loop {
+        if debug {
+            match *core_debug_port.at(0) {
+                VdbApi::Exit => break,
+                VdbApi::Register(None) => {
+                    *core_debug_port.at_mut(0) = VdbApi::Register(Some(core.regs.clone()));
+                }
+                VdbApi::CoreAmount(None) => {
+                    *core_debug_port.at_mut(0) = VdbApi::CoreAmount(Some(core.total_core()));
+                }
+                _ => (),
+            }
+        }
+
         // 更新指令计数
         let count = (*core_instruction_count.at(0)).wrapping_add(1);
         core_instruction_count.write(0, count);
@@ -92,6 +173,11 @@ fn vcore(memory_size: usize, id: usize, total_core: usize) {
         // 检测中断
         if let Some(intid) = core.intctler.interrupted() {
             core.interrupt_jump(intid);
+        }
+
+        if core.nopflag {
+            thread::sleep(Duration::from_micros(1));
+            continue;
         }
 
         // 指令寻址，更新hot_ip
@@ -131,7 +217,6 @@ fn vcore(memory_size: usize, id: usize, total_core: usize) {
         // 现在这两个指令依然会产生InvalidInstruction
         // TODO
         // 添加指令执行内容需在base.rs中实现，并加入到指令空间中
-        println!("{}", opcode);
         if let None = core.instruction_space[opcode as usize] {
             core.intctler.interrupt(InterruptId::InvalidInstruction);
             continue;
@@ -191,5 +276,8 @@ fn vcore(memory_size: usize, id: usize, total_core: usize) {
         let movement = core.instruction_space[opcode as usize].unwrap().0(inst, &mut core);
         core.ip_increment += movement as i64;
         hot_ip += movement;
+        if debug {
+            core.regs.ip += movement;
+        }
     }
 }
