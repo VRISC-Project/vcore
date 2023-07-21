@@ -114,6 +114,7 @@ impl BitOptions for u64 {
     }
 }
 
+/// vrisc寄存器
 #[derive(PartialEq, Clone, Copy)]
 pub struct Registers {
     pub x: [u64; 16],
@@ -219,6 +220,7 @@ impl InterruptController {
     }
 }
 
+/// vcore核心
 pub struct Vcore {
     id: usize,
     total: usize,

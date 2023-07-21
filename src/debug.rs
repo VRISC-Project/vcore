@@ -3,13 +3,29 @@ use std::{thread, time::Duration};
 use crate::{memory::Memory, utils::shared::SharedPointer, vrisc::vcore::Registers};
 
 #[derive(PartialEq, Clone, Copy)]
+pub enum Regs {
+    None,
+    X(usize),
+    Ip,
+    Flag,
+    Ivt,
+    Kpt,
+    Upt,
+    Scp,
+    Imsg,
+    IpDump,
+    FlagDump,
+}
+
+#[derive(PartialEq, Clone, Copy)]
 pub enum VdbApi {
     None,
     Initialized,
     NotRunning,
     StartCore,
+    CoreStarted,
     Register(Option<Registers>),
-    CoreAmount(Option<usize>),
+    WriteRegister(Regs, u64),
     Exit,
     Ok,
 }
@@ -66,18 +82,12 @@ fn core_hack(cmd: &mut Vec<&str>, debug_ports: &mut Vec<SharedPointer<VdbApi>>) 
         "regs" => {
             // 打印寄存器
             let core_id: usize = cmd[1].parse().unwrap();
-            // ### 获取核心总数
-            // 因为至少有一个核心，所以通过core0获取核心数量
-            let core_amount = if let VdbApi::CoreAmount(Some(amount)) = debug_ports[0]
-                .at_mut(0)
-                .get_result(VdbApi::CoreAmount(None))
-            {
-                amount
-            } else {
-                panic!("Internal exception.");
-            };
-            if core_id >= *core_amount {
-                format!("There are {} cores. Using core{}.", core_amount, core_id)
+            if core_id >= debug_ports.len() {
+                format!(
+                    "There are {} cores. Using core{}.",
+                    debug_ports.len(),
+                    core_id
+                )
             } else {
                 match debug_ports[core_id]
                     .at_mut(0)
@@ -104,31 +114,68 @@ fn core_hack(cmd: &mut Vec<&str>, debug_ports: &mut Vec<SharedPointer<VdbApi>>) 
                 }
             }
         }
-        "amount" => {
-            if let VdbApi::CoreAmount(Some(amount)) = debug_ports[0]
-                .at_mut(0)
-                .get_result(VdbApi::CoreAmount(None))
-            {
-                format!("{}", *amount)
-            } else {
-                panic!("Internal exception.");
-            }
-        }
+        "amount" => format!("{}", debug_ports.len()),
         "start" => {
             let core_id: usize = cmd[1].parse().unwrap();
-            if let VdbApi::Ok = debug_ports[core_id].at_mut(0).get_result(VdbApi::StartCore) {
-                "OK".to_string()
+            if debug_ports.len() <= core_id {
+                format!(
+                    "There are {} cores. Using core{}.",
+                    debug_ports.len(),
+                    core_id
+                )
             } else {
-                panic!("Internal exception.");
+                match debug_ports[core_id].at_mut(0).get_result(VdbApi::StartCore) {
+                    VdbApi::Ok => "OK".to_string(),
+                    VdbApi::CoreStarted => format!("core{} started.", core_id),
+                    _ => panic!("Internal exception."),
+                }
+            }
+        }
+        "write" => {
+            let core_id: usize = cmd[1].parse().unwrap();
+            let register = cmd[2];
+            let value: u64 = cmd[3].parse().unwrap();
+            if register.starts_with("x") {
+                let unireg: usize = String::from_utf8(register.as_bytes()[1..].to_vec())
+                    .unwrap()
+                    .parse()
+                    .unwrap();
+                if let VdbApi::Ok = debug_ports[core_id]
+                    .at_mut(0)
+                    .get_result(VdbApi::WriteRegister(Regs::X(unireg), value))
+                {
+                    "OK".to_string()
+                } else {
+                    panic!("Internal exception.");
+                }
+            } else {
+                let wregmsg = match register {
+                    "ip" => VdbApi::WriteRegister(Regs::Ip, value),
+                    "flag" => VdbApi::WriteRegister(Regs::Flag, value),
+                    "ivt" => VdbApi::WriteRegister(Regs::Ivt, value),
+                    "kpt" => VdbApi::WriteRegister(Regs::Kpt, value),
+                    "upt" => VdbApi::WriteRegister(Regs::Upt, value),
+                    "scp" => VdbApi::WriteRegister(Regs::Scp, value),
+                    "imsg" => VdbApi::WriteRegister(Regs::Imsg, value),
+                    "ipdump" => VdbApi::WriteRegister(Regs::IpDump, value),
+                    "flagdump" => VdbApi::WriteRegister(Regs::FlagDump, value),
+                    _ => VdbApi::WriteRegister(Regs::None, value),
+                };
+                if let VdbApi::Ok = debug_ports[core_id].at_mut(0).get_result(wregmsg) {
+                    "OK".to_string()
+                } else {
+                    panic!("Internal exception.");
+                }
             }
         }
         "help" => "usage: core <options>
 
 options:
-    regs <core_id>                  Print all registers.
-    amount                          Print core amount.
-    start <core_id>                 Start core<core_id>.
-    help                            Print this text."
+    regs <core_id>                      Print all registers.
+    amount                              Print core amount.
+    start <core_id>                     Start core<core_id>.
+    write <core_id> <register> <value>  Write value to register.
+    help                                Print this text."
             .to_string(),
         _ => "Undefined command. Type \"mem help\" for help.".to_string(),
     }

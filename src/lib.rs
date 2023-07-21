@@ -40,9 +40,8 @@ pub fn run(config: Config) {
         cores_debug_port[i].write(0, VdbApi::None);
 
         if i == 0 {
-            //core0直接打开
+            // core0直接打开
             cores_startflg[i].write(0, true);
-            println!("core{} opening.", i);
         } else {
             cores_startflg[i].write(0, false);
         }
@@ -130,7 +129,6 @@ fn vcore(memory_size: usize, id: usize, total_core: usize, debug: bool) {
             }
         }
     }
-    println!("core{} started.", id);
 
     /*
     hot_ip时栈上储存的ip寄存器的寻址后值，只有这个值每运行一次指令改变一次。
@@ -159,9 +157,23 @@ fn vcore(memory_size: usize, id: usize, total_core: usize, debug: bool) {
                 VdbApi::Register(None) => {
                     *core_debug_port.at_mut(0) = VdbApi::Register(Some(core.regs.clone()));
                 }
-                VdbApi::CoreAmount(None) => {
-                    *core_debug_port.at_mut(0) = VdbApi::CoreAmount(Some(core.total_core()));
+                VdbApi::WriteRegister(register, value) => {
+                    match register {
+                        debug::Regs::X(uni) => core.regs.x[uni] = value,
+                        debug::Regs::Ip => core.regs.ip = value,
+                        debug::Regs::Flag => core.regs.flag = value,
+                        debug::Regs::Ivt => core.regs.ivt = value,
+                        debug::Regs::Kpt => core.regs.kpt = value,
+                        debug::Regs::Upt => core.regs.upt = value,
+                        debug::Regs::Scp => core.regs.scp = value,
+                        debug::Regs::Imsg => core.regs.imsg = value,
+                        debug::Regs::IpDump => core.regs.ipdump = value,
+                        debug::Regs::FlagDump => core.regs.flagdump = value,
+                        _ => (),
+                    }
+                    *core_debug_port.at_mut(0) = VdbApi::Ok;
                 }
+                VdbApi::StartCore => *core_debug_port.at_mut(0) = VdbApi::CoreStarted,
                 _ => (),
             }
         }
