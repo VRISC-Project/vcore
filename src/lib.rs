@@ -39,8 +39,8 @@ pub fn run(config: Config) {
             .push(SharedPointer::<VdbApi>::new(format!("VcoreCore{}DebugApi", i), 1).unwrap());
         cores_debug_port[i].write(0, VdbApi::None);
 
-        if i == 0 {
-            // core0直接打开
+        if i == 0 && !config.debug {
+            // core0在非debug模式下直接打开
             cores_startflg[i].write(0, true);
         } else {
             cores_startflg[i].write(0, false);
@@ -60,7 +60,7 @@ pub fn run(config: Config) {
         for db in cores_debug_port.as_mut_slice() {
             while *db.at(0) != VdbApi::Initialized {}
         }
-        print!("\n\x1b[34mvdb >\x1b[0m ");
+        print!("\nType \'help\' to learn useage.\n\x1b[34mvdb >\x1b[0m ");
         stdout.flush().unwrap();
     }
     loop {
@@ -223,15 +223,6 @@ fn vcore(memory_size: usize, id: usize, total_core: usize, debug: bool) {
 
         /* 取指令 */
         let opcode = *core.memory.borrow().borrow().at(hot_ip);
-        // 这六个是转移指令
-        // 需要回去更新ip寄存器
-        //
-        // 转移前和转移后都需要更新ip寄存器，转移前在此处设置更新标志
-        // 转移后再转移指令中设置更新标志
-        if opcode >= 20 && opcode < 27 {
-            core.transferred = true;
-            continue;
-        }
         // 这里有个例外
         // opcode=0x3d,0x3e分别是initext和destext指令
         // 目前不予支持
