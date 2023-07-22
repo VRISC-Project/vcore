@@ -558,12 +558,7 @@ pub fn i_jc(inst: &[u8], core: &mut Vcore) -> u64 {
         }
         core.transferred = true;
     }
-    match inst[1].lower() {
-        0 => 4,
-        1 => 6,
-        2 => 10,
-        _ => 0,
-    }
+    0
 }
 
 pub fn i_cc(inst: &[u8], core: &mut Vcore) -> u64 {
@@ -597,16 +592,12 @@ pub fn i_cc(inst: &[u8], core: &mut Vcore) -> u64 {
         }
         core.transferred = true;
     }
-    match inst[1].lower() {
-        0 => 4,
-        1 => 6,
-        2 => 10,
-        _ => 0,
-    }
+    0
 }
 
 pub fn i_r(_inst: &[u8], core: &mut Vcore) -> u64 {
     core.regs.ip = core.regs.ipdump;
+    core.transferred = true;
     0
 }
 
@@ -623,8 +614,10 @@ pub fn i_loop(inst: &[u8], core: &mut Vcore) -> u64 {
         } as i64 as u64;
         core.regs.ip = target;
         core.transferred = true;
+        0
+    } else {
+        6
     }
-    6
 }
 
 pub fn i_ir(inst: &[u8], core: &mut Vcore) -> u64 {
@@ -648,6 +641,7 @@ pub fn i_sysc(_inst: &[u8], core: &mut Vcore) -> u64 {
     core.regs.flagdump = core.regs.flag;
     core.regs.ip = core.regs.scp;
     core.regs.flag.bit_reset(FlagRegFlag::Privilege);
+    core.transferred = true;
     0
 }
 
@@ -657,6 +651,7 @@ pub fn i_sysr(_inst: &[u8], core: &mut Vcore) -> u64 {
     }
     core.regs.ip = core.regs.ipdump;
     core.regs.flag = core.regs.flagdump;
+    core.transferred = true;
     1
 }
 

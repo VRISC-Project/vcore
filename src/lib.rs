@@ -217,11 +217,21 @@ fn vcore(memory_size: usize, id: usize, total_core: usize, debug: bool) {
                     }
                 },
             };
+            core.transferred = false;
             crossed_page = false;
         }
 
         /* 取指令 */
         let opcode = *core.memory.borrow().borrow().at(hot_ip);
+        // 这六个是转移指令
+        // 需要回去更新ip寄存器
+        //
+        // 转移前和转移后都需要更新ip寄存器，转移前在此处设置更新标志
+        // 转移后再转移指令中设置更新标志
+        if opcode >= 20 && opcode < 27 {
+            core.transferred = true;
+            continue;
+        }
         // 这里有个例外
         // opcode=0x3d,0x3e分别是initext和destext指令
         // 目前不予支持
