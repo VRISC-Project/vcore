@@ -1,6 +1,10 @@
 use std::{thread, time::Duration};
 
-use crate::{memory::Memory, utils::shared::SharedPointer, vrisc::vcore::Registers};
+use crate::{
+    memory::Memory,
+    utils::shared::SharedPointer,
+    vrisc::vcore::{DebugMode, Registers},
+};
 
 #[derive(PartialEq, Clone, Copy)]
 pub enum Regs {
@@ -26,6 +30,8 @@ pub enum VdbApi {
     CoreStarted,
     Register(Option<Registers>),
     WriteRegister(Regs, u64),
+    DebugMode(DebugMode),
+    Continue,
     Exit,
     Ok,
 }
@@ -35,11 +41,8 @@ impl VdbApi {
         *self = api;
         {
             let mut counter = 0;
-            while counter < 1000 {
-                if let VdbApi::Register(Some(_)) = self {
-                    break;
-                }
-                thread::sleep(Duration::from_micros(1));
+            while counter < 1000 && api == *self {
+                thread::sleep(Duration::from_millis(1));
                 counter += 1;
             }
         }
@@ -168,12 +171,41 @@ fn core_hack(cmd: &mut Vec<&str>, debug_ports: &mut Vec<SharedPointer<VdbApi>>) 
                 }
             }
         }
+        "dbgmod" => {
+            let core_id: usize = cmd[1].parse().unwrap();
+            let option = cmd[2];
+            let option = if option == "none" {
+                DebugMode::None
+            } else if option == "step" {
+                DebugMode::Step
+            } else {
+                return format!("Unknow option {}.", option);
+            };
+            match debug_ports[core_id]
+                .at_mut(0)
+                .get_result(VdbApi::DebugMode(option))
+            {
+                VdbApi::Ok => String::new(),
+                VdbApi::NotRunning => format!("Core{} is not running.", core_id),
+                _ => panic!("Internal exception."),
+            }
+        }
+        "cont" => {
+            let core_id: usize = cmd[1].parse().unwrap();
+            if let VdbApi::Ok = debug_ports[core_id].at_mut(0).get_result(VdbApi::Continue) {
+                String::new()
+            } else {
+                panic!("Internal exception.");
+            }
+        }
         "help" => "usage: core <options>
 
 options:
     regs <core_id>                      Print all registers.
     amount                              Print core amount.
     start <core_id>                     Start core<core_id>.
+    dbgmod <core_id> [none|step]        Set debugger mode.
+    cont <core_id>                      Run next instruction when in step mode.
     write <core_id> <register> <value>  Write value to register.
     help                                Print this text."
             .to_string(),

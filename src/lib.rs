@@ -18,7 +18,7 @@ use debug::VdbApi;
 use memory::Memory;
 use nix::unistd;
 use utils::shared::SharedPointer;
-use vrisc::vcore::{InterruptId, Vcore};
+use vrisc::vcore::{DebugMode, InterruptId, Vcore};
 
 use crate::debug::command_line;
 
@@ -59,6 +59,7 @@ pub fn run(config: Config) {
     if config.debug {
         for db in cores_debug_port.as_mut_slice() {
             while *db.at(0) != VdbApi::Initialized {}
+            *db.at_mut(0) = VdbApi::None;
         }
         print!("\nType \'help\' to learn useage.\n\x1b[34mvdb >\x1b[0m ");
         stdout.flush().unwrap();
@@ -118,6 +119,7 @@ fn vcore(memory_size: usize, id: usize, total_core: usize, debug: bool) {
 
         if debug {
             match *core_debug_port.at(0) {
+                VdbApi::Initialized => continue,
                 VdbApi::StartCore => {
                     core_startflg.write(0, true);
                     *core_debug_port.at_mut(0) = VdbApi::Ok;
@@ -125,8 +127,13 @@ fn vcore(memory_size: usize, id: usize, total_core: usize, debug: bool) {
                 VdbApi::Exit => {
                     return;
                 }
+                VdbApi::DebugMode(mode) => {
+                    core.debug_mode = mode;
+                    *core_debug_port.at_mut(0) = VdbApi::Ok;
+                }
                 _ => *core_debug_port.at_mut(0) = VdbApi::NotRunning,
             }
+            // *core_debug_port.at_mut(0) = VdbApi::None;
         }
     }
 
@@ -153,7 +160,7 @@ fn vcore(memory_size: usize, id: usize, total_core: usize, debug: bool) {
     loop {
         if debug {
             match *core_debug_port.at(0) {
-                VdbApi::Exit => break,
+                VdbApi::Exit => return,
                 VdbApi::Register(None) => {
                     *core_debug_port.at_mut(0) = VdbApi::Register(Some(core.regs.clone()));
                 }
@@ -174,7 +181,19 @@ fn vcore(memory_size: usize, id: usize, total_core: usize, debug: bool) {
                     *core_debug_port.at_mut(0) = VdbApi::Ok;
                 }
                 VdbApi::StartCore => *core_debug_port.at_mut(0) = VdbApi::CoreStarted,
+                VdbApi::DebugMode(mode) => {
+                    core.debug_mode = mode;
+                    *core_debug_port.at_mut(0) = VdbApi::Ok;
+                }
                 _ => (),
+            }
+            // *core_debug_port.at_mut(0) = VdbApi::None;
+            if core.debug_mode == DebugMode::Step {
+                if let VdbApi::Continue = *core_debug_port.at(0) {
+                    *core_debug_port.at_mut(0) = VdbApi::Ok;
+                } else {
+                    continue;
+                }
             }
         }
 

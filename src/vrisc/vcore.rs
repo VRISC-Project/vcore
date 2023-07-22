@@ -220,6 +220,12 @@ impl InterruptController {
     }
 }
 
+#[derive(PartialEq, Clone, Copy)]
+pub enum DebugMode {
+    None,
+    Step,
+}
+
 /// vcore核心
 pub struct Vcore {
     id: usize,
@@ -231,6 +237,7 @@ pub struct Vcore {
     pub instruction_space: [Option<VcoreInstruction>; 256],
     pub transferred: bool,
     pub nopflag: bool,
+    pub debug_mode: DebugMode,
 }
 
 impl Vcore {
@@ -245,6 +252,7 @@ impl Vcore {
             instruction_space: [None; 256],
             transferred: true,
             nopflag: false,
+            debug_mode: DebugMode::None,
         }
     }
 
