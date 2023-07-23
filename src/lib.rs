@@ -158,6 +158,40 @@ fn vcore(memory_size: usize, id: usize, total_core: usize, debug: bool) {
     core_instruction_count.write(0, u64::MAX);
 
     loop {
+        // 检测中断
+        if let Some(intid) = core.intctler.interrupted() {
+            core.interrupt_jump(intid);
+        }
+
+        // 指令寻址，更新hot_ip
+        if (!core.transferred && hot_ip % (16 * 1024) == 0) || debug {
+            core.regs.ip += core.ip_increment as u64;
+            core.ip_increment = 0;
+        }
+        if core.transferred || hot_ip % (16 * 1024) == 0 || crossed_page {
+            hot_ip = match core
+                .memory
+                .borrow_mut()
+                .address(core.regs.ip, core.regs.flag)
+            {
+                Ok(address) => address,
+                Err(error) => match error {
+                    memory::AddressError::OverSized(address) => {
+                        core.intctler.interrupt(InterruptId::InaccessibleAddress);
+                        core.regs.imsg = address;
+                        continue;
+                    }
+                    memory::AddressError::WrongPrivilege => {
+                        core.intctler.interrupt(InterruptId::WrongPrivilege);
+                        core.regs.imsg = core.regs.ip;
+                        continue;
+                    }
+                },
+            };
+            core.transferred = false;
+            crossed_page = false;
+        }
+
         if debug {
             match *core_debug_port.at(0) {
                 VdbApi::Exit => return,
@@ -185,6 +219,10 @@ fn vcore(memory_size: usize, id: usize, total_core: usize, debug: bool) {
                     core.debug_mode = mode;
                     *core_debug_port.at_mut(0) = VdbApi::Ok;
                 }
+                VdbApi::Instruction(None) => {
+                    *core_debug_port.at_mut(0) =
+                        VdbApi::Instruction(Some(*core.memory.borrow().borrow().at(hot_ip)))
+                }
                 _ => (),
             }
             // *core_debug_port.at_mut(0) = VdbApi::None;
@@ -192,18 +230,10 @@ fn vcore(memory_size: usize, id: usize, total_core: usize, debug: bool) {
                 if let VdbApi::Continue = *core_debug_port.at(0) {
                     *core_debug_port.at_mut(0) = VdbApi::Ok;
                 } else {
+                    thread::sleep(Duration::from_millis(1));
                     continue;
                 }
             }
-        }
-
-        // 更新指令计数
-        let count = (*core_instruction_count.at(0)).wrapping_add(1);
-        core_instruction_count.write(0, count);
-
-        // 检测中断
-        if let Some(intid) = core.intctler.interrupted() {
-            core.interrupt_jump(intid);
         }
 
         if core.nopflag {
@@ -211,34 +241,9 @@ fn vcore(memory_size: usize, id: usize, total_core: usize, debug: bool) {
             continue;
         }
 
-        // 指令寻址，更新hot_ip
-        if !core.transferred && hot_ip % (16 * 1024) == 0 {
-            core.regs.ip += core.ip_increment as u64;
-            core.ip_increment = 0;
-        }
-        if core.transferred || hot_ip % (16 * 1024) == 0 || crossed_page {
-            hot_ip = match core
-                .memory
-                .borrow_mut()
-                .address(core.regs.ip, core.regs.flag)
-            {
-                Ok(address) => address,
-                Err(error) => match error {
-                    memory::AddressError::OverSized(address) => {
-                        core.intctler.interrupt(InterruptId::InaccessibleAddress);
-                        core.regs.imsg = address;
-                        continue;
-                    }
-                    memory::AddressError::WrongPrivilege => {
-                        core.intctler.interrupt(InterruptId::WrongPrivilege);
-                        core.regs.imsg = core.regs.ip;
-                        continue;
-                    }
-                },
-            };
-            core.transferred = false;
-            crossed_page = false;
-        }
+        // 更新指令计数
+        let count = (*core_instruction_count.at(0)).wrapping_add(1);
+        core_instruction_count.write(0, count);
 
         /* 取指令 */
         let opcode = *core.memory.borrow().borrow().at(hot_ip);
@@ -308,8 +313,5 @@ fn vcore(memory_size: usize, id: usize, total_core: usize, debug: bool) {
         let movement = core.instruction_space[opcode as usize].unwrap().0(inst, &mut core);
         core.ip_increment += movement as i64;
         hot_ip += movement;
-        if debug {
-            core.regs.ip += movement;
-        }
     }
 }

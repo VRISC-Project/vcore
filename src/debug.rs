@@ -31,6 +31,7 @@ pub enum VdbApi {
     Register(Option<Registers>),
     WriteRegister(Regs, u64),
     DebugMode(DebugMode),
+    Instruction(Option<u8>),
     Continue,
     Exit,
     Ok,
@@ -198,6 +199,17 @@ fn core_hack(cmd: &mut Vec<&str>, debug_ports: &mut Vec<SharedPointer<VdbApi>>) 
                 panic!("Internal exception.");
             }
         }
+        "inst" => {
+            let core_id: usize = cmd[1].parse().unwrap();
+            if let VdbApi::Instruction(Some(inst)) = debug_ports[core_id]
+                .at_mut(0)
+                .get_result(VdbApi::Instruction(None))
+            {
+                format!("{:#02x}", inst)
+            } else {
+                panic!("Internal exception.");
+            }
+        }
         "help" => "usage: core <options>
 
 options:
@@ -207,6 +219,7 @@ options:
     dbgmod <core_id> [none|step]        Set debugger mode.
     cont <core_id>                      Run next instruction when in step mode.
     write <core_id> <register> <value>  Write value to register.
+    inst <core_id>                      Print the id of the instruction which will be executed.
     help                                Print this text."
             .to_string(),
         _ => "Undefined command. Type \"mem help\" for help.".to_string(),
