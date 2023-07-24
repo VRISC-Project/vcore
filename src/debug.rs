@@ -110,7 +110,7 @@ fn core_hack(cmd: &mut Vec<&str>, debug_ports: &mut Vec<SharedPointer<VdbApi>>) 
                         result.push_str(&format!("scp\t: {:#016x}\n", regs.scp));
                         result.push_str(&format!("imsg\t: {:#016x}\n", regs.imsg));
                         result.push_str(&format!("ipdump\t: {:#016x}\n", regs.ipdump));
-                        result.push_str(&format!("flagdump: {:#016x}\n", regs.flagdump));
+                        result.push_str(&format!("flagdump: {:#016x}", regs.flagdump));
                         result
                     }
                     VdbApi::NotRunning => format!("Core{} is not running.", core_id),
@@ -214,11 +214,11 @@ fn core_hack(cmd: &mut Vec<&str>, debug_ports: &mut Vec<SharedPointer<VdbApi>>) 
 
 options:
     regs <core_id>                      Print all registers.
+    write <core_id> <register> <value>  Write value to register.
     amount                              Print core amount.
     start <core_id>                     Start core<core_id>.
     dbgmod <core_id> [none|step]        Set debugger mode.
     cont <core_id>                      Run next instruction when in step mode.
-    write <core_id> <register> <value>  Write value to register.
     inst <core_id>                      Print the id of the instruction which will be executed.
     help                                Print this text."
             .to_string(),
@@ -270,6 +270,7 @@ fn memory_hack(cmd: &mut Vec<&str>, memory: &mut Memory) -> String {
                     result.push_str("\n");
                     addr += 16;
                 }
+                result.pop();
                 result
             }
         }

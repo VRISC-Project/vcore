@@ -17,7 +17,10 @@ use std::{
 use config::Config;
 use debug::VdbApi;
 use memory::Memory;
-use nix::unistd;
+use nix::{
+    libc::{timeval, timezone},
+    unistd,
+};
 use utils::shared::SharedPointer;
 use vrisc::vcore::{DebugMode, InterruptId, Vcore};
 
@@ -61,7 +64,13 @@ pub fn run(config: Config) {
         match unsafe { unistd::fork().unwrap() } {
             unistd::ForkResult::Parent { child } => cores.push(child),
             unistd::ForkResult::Child => {
-                vcore(config.memory, i, config.cores, config.debug);
+                vcore(
+                    config.memory,
+                    i,
+                    config.cores,
+                    config.debug,
+                    config.external_clock,
+                );
                 exit(0);
             }
         }
@@ -107,7 +116,7 @@ pub fn run(config: Config) {
     }
 }
 
-fn vcore(memory_size: usize, id: usize, total_core: usize, debug: bool) {
+fn vcore(memory_size: usize, id: usize, total_core: usize, debug: bool, external_clock: bool) {
     let mut core_startflg =
         SharedPointer::<bool>::bind(format!("VcoreCore{}StartFlg", id), 1).unwrap();
     // 指令计数，计算从a开始运行到现在此核心共运行了多少条指令
@@ -166,9 +175,30 @@ fn vcore(memory_size: usize, id: usize, total_core: usize, debug: bool) {
 
     let mut crossed_page = false;
 
+    let mut tv_clock = timeval {
+        tv_sec: 0,
+        tv_usec: 0,
+    };
+    let mut usec_buf = 0;
+    let mut clock_count = 0u64;
+
     core_instruction_count.write(0, u64::MAX);
 
     loop {
+        // 内部时钟
+        if !debug && !external_clock {
+            unsafe { nix::libc::gettimeofday(&mut tv_clock, 0 as *mut timezone) };
+            if tv_clock.tv_usec + tv_clock.tv_sec * 1000_000 - usec_buf >= 4000 {
+                core.intctler.interrupt(InterruptId::Clock);
+                usec_buf = tv_clock.tv_usec + tv_clock.tv_sec * 1000_000;
+                clock_count += 1;
+            }
+            if clock_count == 250 {
+                println!(".");
+                clock_count = 0;
+            }
+        }
+
         // 检测中断
         if let Some(intid) = core.intctler.interrupted() {
             core.interrupt_jump(intid);

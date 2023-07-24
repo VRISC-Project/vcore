@@ -20,7 +20,8 @@ pub struct Config {
     #[arg(short, long, default_value_t = false)]
     pub debug: bool,
 
-    /// 是否开启外部时钟
+    /// 是否开启外部时钟(若不开启外部时钟
+    ///                 则使用周期为4ms的内部时钟)
     #[arg(short, long, default_value_t = false)]
     pub external_clock: bool,
 }
