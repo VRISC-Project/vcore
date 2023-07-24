@@ -6,7 +6,8 @@ pub mod vrisc;
 
 use std::{
     cell::RefCell,
-    io::{BufRead, Write},
+    fs::File,
+    io::{BufRead, Read, Write},
     process::exit,
     rc::Rc,
     thread,
@@ -29,6 +30,18 @@ pub fn run(config: Config) {
     let mut cores_debug_port = Vec::new();
 
     let mut memory = Memory::new(config.memory);
+    {
+        let rom = match File::open(config.vrom) {
+            Ok(rom) => rom,
+            Err(err) => panic!("{}", err),
+        };
+        let rom_: Vec<_> = rom.bytes().collect();
+        let mut rom = Vec::new();
+        for x in rom_ {
+            rom.push(x.unwrap());
+        }
+        memory.borrow_mut().write_slice(0, rom.as_slice());
+    }
 
     for i in 0..config.cores {
         cores_startflg
@@ -124,9 +137,7 @@ fn vcore(memory_size: usize, id: usize, total_core: usize, debug: bool) {
                     core_startflg.write(0, true);
                     *core_debug_port.at_mut(0) = VdbApi::Ok;
                 }
-                VdbApi::Exit => {
-                    return;
-                }
+                VdbApi::Exit => break,
                 VdbApi::DebugMode(mode) => {
                     core.debug_mode = mode;
                     *core_debug_port.at_mut(0) = VdbApi::Ok;
@@ -194,7 +205,7 @@ fn vcore(memory_size: usize, id: usize, total_core: usize, debug: bool) {
 
         if debug {
             match *core_debug_port.at(0) {
-                VdbApi::Exit => return,
+                VdbApi::Exit => break,
                 VdbApi::Register(None) => {
                     *core_debug_port.at_mut(0) = VdbApi::Register(Some(core.regs.clone()));
                 }
