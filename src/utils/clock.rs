@@ -1,3 +1,4 @@
+#[cfg(target_os = "linux")]
 use nix::libc::{gettimeofday, timeval, timezone};
 
 pub struct Clock {

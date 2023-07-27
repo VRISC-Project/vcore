@@ -1,6 +1,7 @@
 use core::slice;
 use std::{mem::size_of, num::NonZeroUsize};
 
+#[cfg(target_os = "linux")]
 use nix::{
     errno::Errno,
     fcntl::OFlag,
@@ -11,6 +12,10 @@ use nix::{
     },
     unistd,
 };
+
+#[cfg(target_os = "windows")]
+#[derive(Debug)]
+pub enum MapError {}
 
 #[derive(Debug)]
 pub enum AssignError {
@@ -57,7 +62,7 @@ impl<T> SharedPointer<T> {
     }
 
     #[cfg(target_os = "windows")]
-    pub fn new(name: String, size: usize) -> Result<Self, Errno> {
+    pub fn new(name: String, size: usize) -> Result<Self, MapError> {
         todo!();
     }
 
@@ -95,7 +100,7 @@ impl<T> SharedPointer<T> {
     }
 
     #[cfg(target_os = "windows")]
-    pub fn bind(name: String, size: usize) -> Result<Self, Errno> {
+    pub fn bind(name: String, size: usize) -> Result<Self, MapError> {
         todo!();
     }
 
@@ -119,6 +124,7 @@ impl<T> SharedPointer<T> {
 }
 
 impl<T> Drop for SharedPointer<T> {
+    #[cfg(target_os = "linux")]
     fn drop(&mut self) {
         unsafe { sys::mman::munmap(self.pointer.cast(), self.size).unwrap() };
         unistd::close(self.fd).unwrap();
@@ -126,6 +132,11 @@ impl<T> Drop for SharedPointer<T> {
         // 不写这句会有小概率会在下次运行申请共享内存时发生'ENOENT'，
         // 没搞懂是怎么回事，不过先注释上目前没啥大毛病
         // sys::mman::shm_unlink(("/".to_string() + &self.name).as_str()).unwrap();
+    }
+
+    #[cfg(target_os = "windows")]
+    fn drop(&mut self) {
+        todo!();
     }
 }
 

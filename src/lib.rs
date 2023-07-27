@@ -16,9 +16,10 @@ use std::{
 
 use config::Config;
 use debug::VdbApi;
-use nix::unistd;
 use utils::{clock::Clock, memory::{Memory, AddressError}, shared::SharedPointer};
 use vrisc::vcore::{DebugMode, InterruptId, Vcore};
+#[cfg(target_os = "linux")]
+use nix::unistd;
 
 use crate::debug::command_line;
 
@@ -57,6 +58,7 @@ pub fn run(config: Config) {
         } else {
             cores_startflg[i].write(0, false);
         }
+        #[cfg(target_os = "linux")]
         match unsafe { unistd::fork().unwrap() } {
             unistd::ForkResult::Parent { child } => cores.push(child),
             unistd::ForkResult::Child => {
@@ -70,6 +72,10 @@ pub fn run(config: Config) {
                 exit(0);
             }
         }
+        #[cfg(target_os = "windows")]
+        match () {}
+        #[cfg(target_os = "macos")]
+        match () {}
     }
 
     let mut stdin = std::io::BufReader::new(std::io::stdin());
