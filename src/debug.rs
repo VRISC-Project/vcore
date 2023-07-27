@@ -1,8 +1,7 @@
 use std::{thread, time::Duration};
 
 use crate::{
-    memory::Memory,
-    utils::shared::SharedPointer,
+    utils::{shared::SharedPointer, memory::Memory},
     vrisc::vcore::{DebugMode, Registers},
 };
 

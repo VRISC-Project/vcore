@@ -1,9 +1,9 @@
 pub mod config;
 pub mod debug;
-pub mod memory;
 pub mod utils;
 pub mod vrisc;
 
+use core::panic;
 use std::{
     cell::RefCell,
     fs::File,
@@ -16,12 +16,8 @@ use std::{
 
 use config::Config;
 use debug::VdbApi;
-use memory::Memory;
-use nix::{
-    libc::{timeval, timezone},
-    unistd,
-};
-use utils::shared::SharedPointer;
+use nix::unistd;
+use utils::{clock::Clock, memory::{Memory, AddressError}, shared::SharedPointer};
 use vrisc::vcore::{DebugMode, InterruptId, Vcore};
 
 use crate::debug::command_line;
@@ -175,28 +171,15 @@ fn vcore(memory_size: usize, id: usize, total_core: usize, debug: bool, external
 
     let mut crossed_page = false;
 
-    let mut tv_clock = timeval {
-        tv_sec: 0,
-        tv_usec: 0,
-    };
-    let mut usec_buf = 0;
-    let mut clock_count = 0u64;
+    // 内部时钟 (250Hz)
+    let mut clock = Clock::new(4);
 
     core_instruction_count.write(0, u64::MAX);
 
     loop {
-        // 内部时钟
-        if !debug && !external_clock {
-            unsafe { nix::libc::gettimeofday(&mut tv_clock, 0 as *mut timezone) };
-            if tv_clock.tv_usec + tv_clock.tv_sec * 1000_000 - usec_buf >= 4000 {
-                core.intctler.interrupt(InterruptId::Clock);
-                usec_buf = tv_clock.tv_usec + tv_clock.tv_sec * 1000_000;
-                clock_count += 1;
-            }
-            if clock_count == 250 {
-                println!(".");
-                clock_count = 0;
-            }
+        // 执行时钟
+        if !debug && !external_clock && clock.hit() {
+            core.intctler.interrupt(InterruptId::Clock);
         }
 
         // 检测中断
@@ -217,12 +200,12 @@ fn vcore(memory_size: usize, id: usize, total_core: usize, debug: bool, external
             {
                 Ok(address) => address,
                 Err(error) => match error {
-                    memory::AddressError::OverSized(address) => {
+                    AddressError::OverSized(address) => {
                         core.intctler.interrupt(InterruptId::InaccessibleAddress);
                         core.regs.imsg = address;
                         continue;
                     }
-                    memory::AddressError::WrongPrivilege => {
+                    AddressError::WrongPrivilege => {
                         core.intctler.interrupt(InterruptId::WrongPrivilege);
                         core.regs.imsg = core.regs.ip;
                         continue;
@@ -326,12 +309,12 @@ fn vcore(memory_size: usize, id: usize, total_core: usize, debug: bool, external
                 {
                     Ok(address) => address,
                     Err(error) => match error {
-                        memory::AddressError::OverSized(address) => {
+                        AddressError::OverSized(address) => {
                             core.intctler.interrupt(InterruptId::InaccessibleAddress);
                             core.regs.imsg = address;
                             continue;
                         }
-                        memory::AddressError::WrongPrivilege => {
+                        AddressError::WrongPrivilege => {
                             core.intctler.interrupt(InterruptId::WrongPrivilege);
                             core.regs.imsg = core.regs.ip;
                             continue;

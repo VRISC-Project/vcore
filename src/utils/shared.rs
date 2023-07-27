@@ -27,6 +27,7 @@ pub struct SharedPointer<T> {
 /// ## 注意
 /// 这个结构的`new`和`bind`函数中的参数`size`指申请的字节数，而不是泛型类型的实际大小的数量
 impl<T> SharedPointer<T> {
+    #[cfg(target_os = "linux")]
     pub fn new(name: String, size: usize) -> Result<Self, Errno> {
         if size == 0 {
             panic!("The memory you are allocating sizes 0.");
@@ -55,6 +56,17 @@ impl<T> SharedPointer<T> {
         })
     }
 
+    #[cfg(target_os = "windows")]
+    pub fn new(name: String, size: usize) -> Result<Self, Errno> {
+        todo!();
+    }
+
+    #[cfg(target_os = "macos")]
+    pub fn new(name: String, size: usize) -> Result<Self, Errno> {
+        todo!();
+    }
+
+    #[cfg(target_os = "linux")]
     pub fn bind(name: String, size: usize) -> Result<Self, Errno> {
         if size == 0 {
             panic!("The memory you are allocating sizes 0.");
@@ -80,6 +92,16 @@ impl<T> SharedPointer<T> {
             name,
             fd,
         })
+    }
+
+    #[cfg(target_os = "windows")]
+    pub fn bind(name: String, size: usize) -> Result<Self, Errno> {
+        todo!();
+    }
+
+    #[cfg(target_os = "macos")]
+    pub fn bind(name: String, size: usize) -> Result<Self, Errno> {
+        todo!();
     }
 
     pub fn assign(&mut self, index: usize, t: T) -> Result<(), AssignError> {

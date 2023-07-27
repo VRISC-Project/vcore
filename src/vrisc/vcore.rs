@@ -1,6 +1,6 @@
 use std::{cell::RefCell, rc::Rc};
 
-use crate::memory::Memory;
+use crate::utils::memory::Memory;
 
 use super::base;
 
