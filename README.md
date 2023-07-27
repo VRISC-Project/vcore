@@ -21,5 +21,5 @@ vrisc架构虚拟处理器。
 平台|状态
 :-:|:-
 Linux|正在开发
-Windows|等待适配
+Windows|正在开发
 Mac|等待适配
