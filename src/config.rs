@@ -24,4 +24,15 @@ pub struct Config {
     ///                 则使用周期为4ms的内部时钟)
     #[arg(short, long, default_value_t = false)]
     pub external_clock: bool,
+
+    #[cfg(target_os = "windows")]
+    /// 在windows下有效
+    ///                 表示此进程是由父进程创建的core进程
+    #[arg(short, long, default_value_t = false)]
+    pub process_child: bool,
+
+    #[cfg(target_os = "windows")]
+    /// 核心id
+    #[arg(short, long, default_value_t = 1)]
+    pub id_core: usize,
 }
