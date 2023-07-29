@@ -7,4 +7,4 @@ edition = "2021"
 clap = { version = "4.3.11", features = ["derive"] }
 
 nix = "0.26.2"
-winapi = { version = "0.3.9", features = ["timeapi", "memoryapi"] }
+winapi = { version = "0.3.9", features = ["timeapi", "memoryapi", "processthreadsapi", "handleapi", "errhandlingapi"] }

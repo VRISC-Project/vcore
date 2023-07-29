@@ -1,4 +1,7 @@
 use core::slice;
+#[cfg(target_os = "windows")]
+use std::mem::size_of;
+#[cfg(target_os = "linux")]
 use std::{mem::size_of, num::NonZeroUsize};
 
 #[cfg(target_os = "linux")]
@@ -13,9 +16,23 @@ use nix::{
     unistd,
 };
 
+use winapi::um::handleapi::INVALID_HANDLE_VALUE;
+#[cfg(target_os = "windows")]
+use winapi::{
+    ctypes::c_void,
+    um::memoryapi::{
+        CreateFileMappingW, MapViewOfFile, OpenFileMappingW, UnmapViewOfFile, FILE_MAP_ALL_ACCESS,
+    },
+    um::{errhandlingapi::GetLastError, minwinbase::SECURITY_ATTRIBUTES, winnt::PAGE_READWRITE},
+};
+
 #[cfg(target_os = "windows")]
 #[derive(Debug)]
-pub enum MapError {}
+pub enum MapError {
+    CreateFileMappingError(u32),
+    MapViewOfFileError(u32),
+    OpenFileMappingError(u32),
+}
 
 #[derive(Debug)]
 pub enum AssignError {
@@ -26,7 +43,10 @@ pub struct SharedPointer<T> {
     pub pointer: *mut T,
     size: usize,
     name: String,
+    #[cfg(target_os = "linux")]
     fd: i32,
+    #[cfg(target_os = "windows")]
+    hdl: *mut c_void,
 }
 
 /// ## 注意
@@ -63,7 +83,36 @@ impl<T> SharedPointer<T> {
 
     #[cfg(target_os = "windows")]
     pub fn new(name: String, size: usize) -> Result<Self, MapError> {
-        todo!();
+        let mut namev = Vec::new();
+        let namew = {
+            for x in name.as_bytes() {
+                namev.push(*x as u16);
+            }
+            namev.as_slice()
+        };
+        let hdl = unsafe {
+            CreateFileMappingW(
+                INVALID_HANDLE_VALUE,
+                0 as *mut SECURITY_ATTRIBUTES,
+                PAGE_READWRITE,
+                (size * size_of::<T>() >> 32) as u32,
+                (size * size_of::<T>()) as u32,
+                namew.as_ptr(),
+            )
+        };
+        if hdl == 0 as *mut c_void {
+            return Err(MapError::CreateFileMappingError(unsafe { GetLastError() }));
+        }
+        let addr = unsafe { MapViewOfFile(hdl, FILE_MAP_ALL_ACCESS, 0, 0, 0) };
+        if addr == 0 as *mut c_void {
+            return Err(MapError::MapViewOfFileError(unsafe { GetLastError() }));
+        }
+        Ok(SharedPointer {
+            pointer: addr as *mut T,
+            size,
+            name,
+            hdl,
+        })
     }
 
     #[cfg(target_os = "macos")]
@@ -101,25 +150,30 @@ impl<T> SharedPointer<T> {
 
     #[cfg(target_os = "windows")]
     pub fn bind(name: String, size: usize) -> Result<Self, MapError> {
-        todo!();
+        let mut namev = Vec::new();
+        for x in name.as_bytes() {
+            namev.push(*x as u16);
+        }
+        let namew = namev.as_slice();
+        let hdl = unsafe { OpenFileMappingW(PAGE_READWRITE, false as i32, namew.as_ptr()) };
+        if hdl == 0 as *mut c_void {
+            return Err(MapError::CreateFileMappingError(unsafe { GetLastError() }));
+        }
+        let addr = unsafe { MapViewOfFile(hdl, FILE_MAP_ALL_ACCESS, 0, 0, 0) };
+        if addr == 0 as *mut c_void {
+            return Err(MapError::MapViewOfFileError(unsafe { GetLastError() }));
+        }
+        Ok(SharedPointer {
+            pointer: addr as *mut T,
+            size,
+            name,
+            hdl,
+        })
     }
 
     #[cfg(target_os = "macos")]
     pub fn bind(name: String, size: usize) -> Result<Self, Errno> {
         todo!();
-    }
-
-    pub fn assign(&mut self, index: usize, t: T) -> Result<(), AssignError> {
-        if index * size_of::<T>() > self.size {
-            return Err(AssignError::IndexOutOfSize);
-        }
-        let p = &t as *const T as *const u8;
-        unsafe {
-            for i in 0..size_of::<T>() {
-                *(self.pointer.add(index * size_of::<T>() + i) as *mut u8) = *p.add(i);
-            }
-        };
-        Ok(())
     }
 }
 
@@ -128,6 +182,7 @@ impl<T> Drop for SharedPointer<T> {
     fn drop(&mut self) {
         unsafe { sys::mman::munmap(self.pointer.cast(), self.size).unwrap() };
         unistd::close(self.fd).unwrap();
+        self.pointer = 0 as *mut T;
         // 写了这句会出现'ENOENT'错误
         // 不写这句会有小概率会在下次运行申请共享内存时发生'ENOENT'，
         // 没搞懂是怎么回事，不过先注释上目前没啥大毛病
@@ -136,7 +191,13 @@ impl<T> Drop for SharedPointer<T> {
 
     #[cfg(target_os = "windows")]
     fn drop(&mut self) {
-        todo!();
+        use winapi::um::handleapi::CloseHandle;
+
+        unsafe {
+            UnmapViewOfFile(self.pointer as *mut c_void);
+            CloseHandle(self.hdl);
+        }
+        self.pointer = 0 as *mut T;
     }
 }
 

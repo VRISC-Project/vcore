@@ -4,26 +4,50 @@ pub mod utils;
 pub mod vrisc;
 
 use core::panic;
+#[cfg(target_os = "linux")]
+use nix::unistd;
+#[cfg(target_os = "windows")]
+use std::ptr::null_mut;
 use std::{
     cell::RefCell,
     fs::File,
     io::{BufRead, Read, Write},
+    mem::size_of,
     process::exit,
     rc::Rc,
     thread,
     time::Duration,
 };
+#[cfg(target_os = "windows")]
+use winapi::um::processthreadsapi::STARTUPINFOW;
+use winapi::um::{
+    errhandlingapi::GetLastError,
+    processthreadsapi::{CreateProcessW, PROCESS_INFORMATION},
+};
 
 use config::Config;
 use debug::VdbApi;
-use utils::{clock::Clock, memory::{Memory, AddressError}, shared::SharedPointer};
+use utils::{
+    clock::Clock,
+    memory::{AddressError, Memory},
+    shared::SharedPointer,
+};
 use vrisc::vcore::{DebugMode, InterruptId, Vcore};
-#[cfg(target_os = "linux")]
-use nix::unistd;
 
 use crate::debug::command_line;
 
 pub fn run(config: Config) {
+    #[cfg(target_os = "windows")]
+    if config.process_child {
+        vcore(
+            config.memory,
+            config.id_core,
+            config.cores,
+            config.debug,
+            config.external_clock,
+        );
+        exit(0);
+    }
     let mut cores = Vec::new();
     let mut cores_startflg = Vec::new();
     let mut cores_inst_count = Vec::new();
@@ -73,9 +97,78 @@ pub fn run(config: Config) {
             }
         }
         #[cfg(target_os = "windows")]
-        match () {}
+        {
+            let mut si = STARTUPINFOW {
+                cb: size_of::<STARTUPINFOW>() as u32,
+                lpReserved: null_mut(),
+                lpDesktop: null_mut(),
+                lpTitle: null_mut(),
+                dwX: 0,
+                dwY: 0,
+                dwXSize: 0,
+                dwYSize: 0,
+                dwXCountChars: 0,
+                dwYCountChars: 0,
+                dwFillAttribute: 0,
+                dwFlags: 0,
+                wShowWindow: 0,
+                cbReserved2: 0,
+                lpReserved2: null_mut(),
+                hStdInput: null_mut(),
+                hStdOutput: null_mut(),
+                hStdError: null_mut(),
+            };
+            let mut pi = PROCESS_INFORMATION {
+                hProcess: null_mut(),
+                hThread: null_mut(),
+                dwProcessId: 0,
+                dwThreadId: 0,
+            };
+            let mut cmd = String::new();
+            let cmdp = {
+                for s in std::env::args() {
+                    cmd.push_str(&format!("{} ", s));
+                }
+                cmd.push_str("-p ");
+                cmd.push_str(&format!("-i {}", i));
+                let cmd = cmd.as_bytes();
+                let mut res = Vec::new();
+                let mut cmd = {
+                    for x in cmd {
+                        res.push(*x as u16);
+                    }
+                    res
+                };
+                cmd.as_mut_ptr()
+            };
+            println!("{}", cmd);
+            if !unsafe {
+                if CreateProcessW(
+                    null_mut(),
+                    cmdp,
+                    null_mut(),
+                    null_mut(),
+                    false as i32,
+                    0,
+                    null_mut(),
+                    null_mut(),
+                    &mut si,
+                    &mut pi,
+                ) != 0
+                {
+                    true
+                } else {
+                    false
+                }
+            } {
+                panic!("Failed to create new process. {}", unsafe {
+                    GetLastError()
+                });
+            }
+            cores.push(pi.hProcess);
+        }
         #[cfg(target_os = "macos")]
-        match () {}
+        {}
     }
 
     let mut stdin = std::io::BufReader::new(std::io::stdin());

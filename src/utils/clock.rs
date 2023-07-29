@@ -1,5 +1,7 @@
 #[cfg(target_os = "linux")]
 use nix::libc::{gettimeofday, timeval, timezone};
+#[cfg(target_os = "windows")]
+use winapi::um::timeapi::timeGetTime;
 
 pub struct Clock {
     cycle: u8, // ms
@@ -32,7 +34,13 @@ impl Clock {
 
     #[cfg(target_os = "windows")]
     pub fn hit(&mut self) -> bool {
-        todo!();
+        let t = unsafe { timeGetTime() };
+        if t * 1000 - self.last_usec as u32 >= self.cycle as u32 * 1000 {
+            self.last_usec = t as i64 * 1000;
+            true
+        } else {
+            false
+        }
     }
 
     #[cfg(target_os = "macos")]
