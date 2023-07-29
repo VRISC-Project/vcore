@@ -16,6 +16,7 @@ use nix::{
     unistd,
 };
 
+#[cfg(target_os = "windows")]
 use winapi::um::handleapi::INVALID_HANDLE_VALUE;
 #[cfg(target_os = "windows")]
 use winapi::{

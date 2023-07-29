@@ -12,18 +12,19 @@ use std::{
     cell::RefCell,
     fs::File,
     io::{BufRead, Read, Write},
-    mem::size_of,
     process::exit,
     rc::Rc,
     thread,
     time::Duration,
 };
 #[cfg(target_os = "windows")]
-use winapi::um::processthreadsapi::STARTUPINFOW;
 use winapi::um::{
     errhandlingapi::GetLastError,
+    processthreadsapi::STARTUPINFOW,
     processthreadsapi::{CreateProcessW, PROCESS_INFORMATION},
 };
+#[cfg(target_os = "windows")]
+use std::mem::size_of;
 
 use config::Config;
 use debug::VdbApi;
