@@ -32,7 +32,8 @@ pub struct Config {
     pub process_child: bool,
 
     #[cfg(target_os = "windows")]
-    /// 核心id
+    /// 在windows下有效
+    ///                 在传递process_child参数的同时使用，代表核心id
     #[arg(short, long, default_value_t = 1)]
     pub id_core: usize,
 }

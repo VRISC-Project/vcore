@@ -6,8 +6,6 @@ pub mod vrisc;
 use core::panic;
 #[cfg(target_os = "linux")]
 use nix::unistd;
-#[cfg(target_os = "windows")]
-use std::ptr::null_mut;
 use std::{
     cell::RefCell,
     fs::File,
@@ -18,13 +16,13 @@ use std::{
     time::Duration,
 };
 #[cfg(target_os = "windows")]
+use std::{mem::size_of, ptr::null_mut};
+#[cfg(target_os = "windows")]
 use winapi::um::{
     errhandlingapi::GetLastError,
     processthreadsapi::STARTUPINFOW,
     processthreadsapi::{CreateProcessW, PROCESS_INFORMATION},
 };
-#[cfg(target_os = "windows")]
-use std::mem::size_of;
 
 use config::Config;
 use debug::VdbApi;
@@ -176,7 +174,12 @@ pub fn run(config: Config) {
     let mut stdout = std::io::BufWriter::new(std::io::stdout());
     if config.debug {
         for db in cores_debug_port.as_mut_slice() {
-            while *db.at(0) != VdbApi::Initialized {}
+            while *db.at(0) != VdbApi::Initialized {
+                // 在release模式中，这个循环会被优化成死循环，必须在
+                // 循环里做点io操作，让它不被优化成死循环。
+                // 相当于手动同步共享变量
+                stdout.flush().unwrap();
+            }
             *db.at_mut(0) = VdbApi::None;
         }
         print!("\nType \'help\' to learn useage.\n\x1b[34mvdb >\x1b[0m ");
@@ -184,6 +187,9 @@ pub fn run(config: Config) {
     }
     loop {
         thread::sleep(Duration::from_micros(1));
+        // debug信息输入输出机制
+        // 命令提示符及终端输入等操作由如下代码进行，command_line()函数只负责处理
+        // 输入的命令以及对vcore虚拟机对应的状态进行修改和查询。
         if config.debug {
             if let Some(cmd) = {
                 let buffer = stdin.fill_buf().unwrap();
@@ -196,14 +202,14 @@ pub fn run(config: Config) {
                 }
             } {
                 let result = command_line(&cmd, &mut memory, &mut cores_debug_port);
-                if !result.is_empty() {
-                    println!("{}", result);
-                }
                 if result == "exit" {
                     for db in cores_debug_port.as_mut_slice() {
                         db.at_mut(0).get_result(VdbApi::Exit);
                     }
                     break;
+                }
+                if !result.is_empty() {
+                    println!("{}", result);
                 }
                 print!("\x1b[34mvdb >\x1b[0m ");
                 stdout.flush().unwrap();
@@ -262,7 +268,7 @@ fn vcore(memory_size: usize, id: usize, total_core: usize, debug: bool, external
         产生转移：转移很可能导致ip不在此页中
         遇到最小页边界：此时地址大概率不在同一页中。“大概率”指有时分页会有
             大页，在大页中的较小页边界两侧的内存都在同一页中，但是由于最小页
-            有16KB，遇到最小页边界的概率也不大，判断一个最小页边界是否是此页
+            有16KB，遇到最小页边界的概率也不大，判断一个最小页边界是否是此页S
             的边界会消耗更多时间（这得从顶级页表开始一级一级地查才能查到）。
 
     在此顺便说明，core.ip_increment是自core.regs.ip被同步以来的总increment
