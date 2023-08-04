@@ -292,7 +292,7 @@ fn vcore(memory_size: usize, id: usize, total_core: usize, debug: bool, external
         if let Some(intid) = core.intctler.interrupted() {
             core.interrupt_jump(intid);
         }
-
+        
         // 指令寻址，更新hot_ip
         if (!core.transferred && hot_ip % (16 * 1024) == 0) || debug {
             core.regs.ip += core.ip_increment as u64;
@@ -355,7 +355,6 @@ fn vcore(memory_size: usize, id: usize, total_core: usize, debug: bool, external
                 }
                 _ => (),
             }
-            // *core_debug_port.at_mut(0) = VdbApi::None;
             if core.debug_mode == DebugMode::Step {
                 if let VdbApi::Continue = *core_debug_port.at(0) {
                     *core_debug_port.at_mut(0) = VdbApi::Ok;
@@ -439,6 +438,7 @@ fn vcore(memory_size: usize, id: usize, total_core: usize, debug: bool, external
                 inst.as_slice()
             }
         };
+
         /* 执行指令 */
         let movement = core.instruction_space[opcode as usize].unwrap().0(inst, &mut core);
         core.ip_increment += movement as i64;

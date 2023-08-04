@@ -1,1 +1,1 @@
-RWS Vrisc Vcore 0.0.1
+RWS Vrisc Vcore 0.2.0

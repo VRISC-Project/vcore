@@ -1,0 +1,52 @@
+section .ivt starts=0 align=8
+
+#magic
+
+jd *.text.boot
+
+#ivt    // 中断向量表（Interrupt Vectors Table）
+
+dq *.text.irh.invalid_addr        // irq1
+dq *.text.irh.device              // irq2
+dq *.text.irh.clock               // irq3
+dq *.text.irh.invalid_inst        // irq4
+dq *.text.irh.permission          // irq5
+dq *.text.irh.invalid_ioport      // irq6
+
+section .text starts=0x100
+
+#boot
+
+ldi $0, %x0
+
+#
+    nop
+loop %x0, *p
+
+section .text.irh align=8
+
+// 中断处理程序（Interrupt Request Handlers）
+
+#invalid_addr
+ei
+ir $0
+
+#device
+ei
+ir $1
+
+#clock
+ei
+ir $1
+
+#invalid_inst
+ei
+ir $0
+
+#permission
+ei
+ir $0
+
+#invalid_ioport
+ei
+ir $0

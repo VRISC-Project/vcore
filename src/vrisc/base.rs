@@ -504,30 +504,6 @@ pub fn i_xor(inst: &[u8], core: &mut Vcore) -> u64 {
     3
 }
 
-pub fn i_0e(_inst: &[u8], _core: &mut Vcore) -> u64 {
-    0
-}
-
-pub fn i_0f(_inst: &[u8], _core: &mut Vcore) -> u64 {
-    0
-}
-
-pub fn i_10(_inst: &[u8], _core: &mut Vcore) -> u64 {
-    0
-}
-
-pub fn i_11(_inst: &[u8], _core: &mut Vcore) -> u64 {
-    0
-}
-
-pub fn i_12(_inst: &[u8], _core: &mut Vcore) -> u64 {
-    0
-}
-
-pub fn i_13(_inst: &[u8], _core: &mut Vcore) -> u64 {
-    0
-}
-
 pub fn i_jc(inst: &[u8], core: &mut Vcore) -> u64 {
     if core
         .regs
@@ -553,6 +529,7 @@ pub fn i_jc(inst: &[u8], core: &mut Vcore) -> u64 {
                     | ((inst[7] as u64) << 40)
                     | ((inst[8] as u64) << 48)
                     | ((inst[9] as u64) << 56)) as u64;
+                println!("{:x}", core.regs.ip)
             }
             _ => (),
         }
@@ -653,10 +630,6 @@ pub fn i_sysr(_inst: &[u8], core: &mut Vcore) -> u64 {
     core.regs.flag = core.regs.flagdump;
     core.transferred = true;
     1
-}
-
-pub fn i_1b(_inst: &[u8], _core: &mut Vcore) -> u64 {
-    0
 }
 
 pub fn i_ldi(inst: &[u8], core: &mut Vcore) -> u64 {
@@ -777,72 +750,12 @@ pub fn i_stm(inst: &[u8], core: &mut Vcore) -> u64 {
     3
 }
 
-pub fn i_1f(_inst: &[u8], _core: &mut Vcore) -> u64 {
-    0
-}
-
 pub fn i_in(_inst: &[u8], _core: &mut Vcore) -> u64 {
     todo!();
 }
 
 pub fn i_out(_inst: &[u8], _core: &mut Vcore) -> u64 {
     todo!();
-}
-
-pub fn i_22(_inst: &[u8], _core: &mut Vcore) -> u64 {
-    0
-}
-
-pub fn i_23(_inst: &[u8], _core: &mut Vcore) -> u64 {
-    0
-}
-
-pub fn i_24(_inst: &[u8], _core: &mut Vcore) -> u64 {
-    0
-}
-
-pub fn i_25(_inst: &[u8], _core: &mut Vcore) -> u64 {
-    0
-}
-
-pub fn i_26(_inst: &[u8], _core: &mut Vcore) -> u64 {
-    0
-}
-
-pub fn i_27(_inst: &[u8], _core: &mut Vcore) -> u64 {
-    0
-}
-
-pub fn i_28(_inst: &[u8], _core: &mut Vcore) -> u64 {
-    0
-}
-
-pub fn i_29(_inst: &[u8], _core: &mut Vcore) -> u64 {
-    0
-}
-
-pub fn i_2a(_inst: &[u8], _core: &mut Vcore) -> u64 {
-    0
-}
-
-pub fn i_2b(_inst: &[u8], _core: &mut Vcore) -> u64 {
-    0
-}
-
-pub fn i_2c(_inst: &[u8], _core: &mut Vcore) -> u64 {
-    0
-}
-
-pub fn i_2d(_inst: &[u8], _core: &mut Vcore) -> u64 {
-    0
-}
-
-pub fn i_2e(_inst: &[u8], _core: &mut Vcore) -> u64 {
-    0
-}
-
-pub fn i_2f(_inst: &[u8], _core: &mut Vcore) -> u64 {
-    0
 }
 
 pub fn i_ei(_inst: &[u8], core: &mut Vcore) -> u64 {
@@ -932,11 +845,11 @@ pub fn i_sflagdump(inst: &[u8], core: &mut Vcore) -> u64 {
 pub fn i_cpuid(_inst: &[u8], core: &mut Vcore) -> u64 {
     match core.regs.x[0] {
         0 => {
-            // 52 57 53 20 56 72 69 73 | 63 20 56 63 6F 72 65 20 | 30 2E 30 2E 31
-            // RWS Vrisc Vcore 0.0.1
+            // 52 57 53 20 56 72 69 73 | 63 20 56 63 6F 72 65 20 | 30 2E 32 2E 30
+            // RWS Vrisc Vcore 0.2.0
             core.regs.x[0] = 0x7369_7256_2053_5752;
             core.regs.x[1] = 0x2065_726f_6356_2063;
-            core.regs.x[2] = 0x0000_0031_2e30_2e30;
+            core.regs.x[2] = 0x0000_0030_2e32_2e30;
             core.regs.x[3] = 0x0000_0000_0000_0000;
         }
         1 => {
@@ -964,13 +877,9 @@ pub fn i_cpuid(_inst: &[u8], core: &mut Vcore) -> u64 {
 }
 
 pub fn i_initext(_inst: &[u8], _core: &mut Vcore) -> u64 {
-    0
+    2
 }
 
 pub fn i_destext(_inst: &[u8], _core: &mut Vcore) -> u64 {
-    0
-}
-
-pub fn i_3f(_inst: &[u8], _core: &mut Vcore) -> u64 {
-    0
+    1
 }
