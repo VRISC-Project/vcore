@@ -4,6 +4,9 @@ use super::base;
 
 pub type VcoreInstruction = (fn(&[u8], &mut Vcore) -> u64, u64);
 
+/// flag寄存器的标志位
+///
+/// > 详见vrisc架构文档
 pub enum FlagRegFlag {
     Zero = 0,
     Symbol = 1,
@@ -18,6 +21,9 @@ pub enum FlagRegFlag {
     Privilege = 10,
 }
 
+/// 指令的条件码
+///
+/// > 详见vrisc架构文档
 pub enum ConditionCode {
     None = 0,
     Zero = 1,
@@ -57,12 +63,18 @@ impl ConditionCode {
     }
 }
 
+/// ## 位操作
 pub trait BitOptions {
     fn bit_set(&mut self, flag: FlagRegFlag);
     fn bit_reset(&mut self, flag: FlagRegFlag);
     fn bit_get(&self, flag: FlagRegFlag) -> bool;
 
+    /// 在指令中使用，根据执行前后寄存器的不同对flag寄存器的标志位进行设置
+    ///
+    /// 此函数只应对Vcore::regs.flag使用
     fn mark_symbol(&mut self, reg_before: u64, reg_after: u64);
+
+    /// 查看对应标志位是否被置位
     fn satisfies_condition(&self, cond: ConditionCode) -> bool;
 }
 
@@ -157,6 +169,7 @@ impl Registers {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
 pub enum InterruptId {
     NI = 0,
     InaccessibleAddress = 1,
@@ -167,23 +180,12 @@ pub enum InterruptId {
     InaccessibleIOPort = 6,
 }
 
-impl Clone for InterruptId {
-    fn clone(&self) -> Self {
-        match self {
-            Self::NI => Self::NI,
-            Self::InaccessibleAddress => Self::InaccessibleAddress,
-            Self::Device => Self::Device,
-            Self::Clock => Self::Clock,
-            Self::InvalidInstruction => Self::InvalidInstruction,
-            Self::WrongPrivilege => Self::WrongPrivilege,
-            Self::InaccessibleIOPort => Self::InaccessibleIOPort,
-        }
-    }
-}
-impl Copy for InterruptId {}
-
+/// 中断控制器
+///
+/// 负责处理中断
 pub struct InterruptController {
     intflag: bool,
+    /// 在intflag为`true`时使用
     intid: InterruptId,
 }
 
@@ -220,20 +222,53 @@ impl InterruptController {
 
 #[derive(PartialEq, Clone, Copy, Debug)]
 pub enum DebugMode {
+    /// 不debug，正常执行
     None,
+
+    /// 单步执行
     Step,
 }
 
 /// vcore核心
 pub struct Vcore {
     id: usize,
+    /// 代表此vcore中共有多少个核心
     total: usize,
     pub regs: Registers,
     pub memory: Memory,
     pub intctler: InterruptController,
+
+    /// ## ip增量
+    ///
+    /// 每次执行指令后，ip会跳转至下一个应该执行的指令处，
+    /// 如果直接更新ip寄存器，每次都要重新寻址。
+    ///
+    /// 我们使用如下机制来减缓寻址的频率并保证运行时数据正确：
+    ///
+    /// * 在vcore核心函数中，使用一个hot_ip记录当前ip对应的物理地址
+    /// * 指令执行后，不会立即更新ip寄存器，会更新hot_ip，只要没有越过页框边界那物理地址一定是正确的。
+    ///     此成员就是用来记录ip跳转情况的。
+    /// * 只有越过页框边界或执行转移指令才更新ip寄存器
+    /// * 执行转移指令前后都更新ip寄存器，使得中断信息以及中断时的ip及flag转储值正确
     pub ip_increment: i64,
+
+    /// ## 指令空间
+    ///
+    /// 最初只会加载基本指令集，其它指令集需要在运行时用扩展指令加载。
     pub instruction_space: [Option<VcoreInstruction>; 256],
+
+    /// ## 转移标志
+    ///
+    /// 在执行转移指令前后，此标志都会置为true，
+    /// 然后vcore核心函数会更新ip寄存器
     pub transferred: bool,
+
+    /// ## nop标志
+    ///
+    /// 由于在nop过程中也要使debugger能够使用，在vcore核心函数的主循环中判断nopflag
+    /// 以阻止取指令和执行指令的过程，达到nop指令的效果。
+    ///
+    /// > `nop`指令详见vrisc结构文档
     pub nopflag: bool,
     pub debug_mode: DebugMode,
 }
@@ -254,18 +289,16 @@ impl Vcore {
         }
     }
 
+    /// 将基本指令集加载到指令空间中
     pub fn init(&mut self) {
         self.instruction_space[..64].copy_from_slice(&base::BASE);
     }
 
-    /*中断跳转
-    当发生中断时，
-    dump寄存器转存ip与flag寄存器状态，
-    进入内核态
-    关闭中断
-    ip跳转
-    中断控制器复位
-    */
+    
+    /// ## 中断跳转
+    /// 
+    /// 当发生中断时，dump寄存器转存ip与flag寄存器状态，进入内核态，
+    /// 关闭中断，ip跳转，中断控制器复位
     pub fn interrupt_jump(&mut self, intid: InterruptId) {
         if self.regs.flag.bit_get(FlagRegFlag::InterruptEnabled) {
             self.regs.flagdump = self.regs.flag;
@@ -303,6 +336,7 @@ impl Vcore {
         self.total
     }
 
+    /// ## 复位vcore核心
     pub fn reset(&mut self) {
         self.regs.reset();
         self.intctler.reset();
@@ -312,10 +346,11 @@ impl Vcore {
         self.init();
     }
 
-    // 特权级检查
-    // 只需在特权指令中调用
-    // 若为内核态返回true，若为用户态返回false
-    // 自动产生中断
+    /// ## 特权级检查
+    /// 
+    /// 只需在特权指令中调用
+    /// 
+    /// 若权限不符，产生中断
     pub fn privilege_test(&mut self) -> bool {
         if self.regs.flag.bit_get(FlagRegFlag::Privilege) {
             self.intctler.interrupt(InterruptId::InvalidInstruction);

@@ -28,6 +28,22 @@ use utils::{
 use vrisc::vcore::DebugMode;
 use vrisc::vcore::{InterruptId, Vcore};
 
+/// # vcore从这里开始运行
+/// 
+/// 创建内存、创建vcore核心，在debugger特性打开时创建debugger。
+/// 
+/// 每个vcore核心都运行在不同进程中，通过SharedPointer共享内存实现进程间通信。
+/// 
+/// ## 在linux上
+/// 
+/// 使用fork创建vcore核心。
+/// 
+/// ## 在windows上
+/// 
+/// 由于windows上没有与fork效果类似的函数，因此在Config中添加了两个参数用于表示
+/// 这是一个vcore核心进程以及传递此核心的core id。
+/// 在windows平台上会首先检测此参数是否存在并跳至vcore运行，
+/// 对于主进程，使用winapi创建进程用于vcore核心。
 pub fn run(config: Config) {
     #[cfg(target_os = "windows")]
     if config.process_child {
@@ -178,6 +194,11 @@ pub fn run(config: Config) {
     }
 }
 
+/// ## vcore核心
+/// 
+/// 首先绑定内存和与主进程通信的共享内存，然后等待核心被打开，最后进入核心主循环。
+/// 
+/// 由于debugger的存在，执行一条指令的过程并没有在这里完全体现出来。
 fn vcore(memory_size: usize, id: usize, total_core: usize, debug: bool, external_clock: bool) {
     let mut core_startflg =
         SharedPointer::<bool>::bind(format!("VcoreCore{}StartFlg", id), 1).unwrap();
@@ -198,7 +219,7 @@ fn vcore(memory_size: usize, id: usize, total_core: usize, debug: bool, external
     }
 
     while !*core_startflg.at(0) {
-        //等待核心被允许开始
+        // 等待核心被允许开始
         thread::sleep(Duration::from_millis(1));
 
         #[cfg(feature = "debugger")]

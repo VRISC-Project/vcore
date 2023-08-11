@@ -3,6 +3,7 @@ use nix::libc::{gettimeofday, timeval, timezone};
 #[cfg(target_os = "windows")]
 use winapi::um::timeapi::timeGetTime;
 
+/// ## vcore内部时钟
 pub struct Clock {
     cycle: u8, // ms
 
@@ -10,6 +11,7 @@ pub struct Clock {
 }
 
 impl Clock {
+    /// ### 创建一个周期为`cycle`的时钟
     pub fn new(cycle: u8) -> Self {
         Clock {
             cycle,
@@ -18,6 +20,9 @@ impl Clock {
     }
 
     #[cfg(target_os = "linux")]
+    /// ## 判断是否已经过了一个周期
+    /// 
+    /// 返回true时要产生一个中断
     pub fn hit(&mut self) -> bool {
         let mut tv = timeval {
             tv_sec: 0,

@@ -41,6 +41,13 @@ pub enum AssignError {
 }
 
 #[derive(Debug, Clone)]
+/// ## 共享内存的指针
+/// 
+/// 将linux、winows、mac三个平台上的共享内存功能封装。
+///
+/// > 并不是智能指针
+///
+/// * 目前需确保在一个进程只调用过一次new和bind函数。
 pub struct SharedPointer<T> {
     pub pointer: *mut T,
     size: usize,
@@ -51,8 +58,6 @@ pub struct SharedPointer<T> {
     hdl: *mut c_void,
 }
 
-/// ## 注意
-/// 这个结构的`new`和`bind`函数中的参数`size`指申请的字节数，而不是泛型类型的实际大小的数量
 impl<T> SharedPointer<T> {
     #[cfg(target_os = "linux")]
     pub fn new(name: String, size: usize) -> Result<Self, Errno> {
@@ -185,10 +190,6 @@ impl<T> Drop for SharedPointer<T> {
         unsafe { sys::mman::munmap(self.pointer.cast(), self.size).unwrap() };
         unistd::close(self.fd).unwrap();
         self.pointer = 0 as *mut T;
-        // 写了这句会出现'ENOENT'错误
-        // 不写这句会有小概率会在下次运行申请共享内存时发生'ENOENT'，
-        // 没搞懂是怎么回事，不过先注释上目前没啥大毛病
-        // sys::mman::shm_unlink(("/".to_string() + &self.name).as_str()).unwrap();
     }
 
     #[cfg(target_os = "windows")]

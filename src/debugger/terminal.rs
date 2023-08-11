@@ -14,6 +14,17 @@ use crate::utils::{memory::Memory, shared::SharedPointer};
 use super::debug::{Debugger, VdbApi};
 
 #[derive(Debug)]
+/// ## 终端
+/// 
+/// 为vcore debugger提供的一个shell
+/// 
+/// 实现了如下功能：
+/// 
+/// * `backspace`删除光标前的字符
+/// * `delete`删除光标后的字符
+/// * 左右键移动光标
+/// * `ctrl`+左右键将光标移动一个字
+/// * 上下键还原历史命令（未输入的情况下）
 pub struct Terminal {
     cmd: String,
     cursor: usize,
@@ -38,8 +49,10 @@ impl Terminal {
         }
     }
 
+    /// ## 打印命令提示符
+    /// 
+    /// 如果有正在调试的核心，在命令提示符中体现
     pub fn prompt(&mut self, debugging_core: Option<usize>) {
-        // 命令提示符
         if let Some(core) = debugging_core {
             execute!(self.stdout, SetForegroundColor(Color::Green)).unwrap();
             write!(self.stdout, "{}", core).unwrap();
@@ -57,8 +70,9 @@ impl Terminal {
     }
 
     /// ## 新的一行
-    ///     此函数只会在raw模式中将光标移到行首，
-    ///     换行符需要自己输出。
+    /// 
+    /// 此函数只会在raw模式中将光标移到行首，
+    /// 换行符需要自己输出。
     pub fn newline(stdout: &mut Stdout) {
         let _ = stdout.queue(cursor::MoveLeft(65535));
     }
@@ -317,6 +331,7 @@ impl Terminal {
                 ..
             }) => {
                 if self.cursor == 0 {
+                    self.typed = false;
                     return true;
                 }
                 self.do_backspace(modifiers);

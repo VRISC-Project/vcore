@@ -12,6 +12,9 @@ use crossterm::style::{Attribute, Print, SetAttribute};
 use super::terminal::Terminal;
 
 #[derive(PartialEq, Clone, Copy, Debug)]
+/// ## 寄存器名
+/// 
+/// 用于debug中传递需要的寄存器
 pub enum Regs {
     None,
     X(usize),
@@ -32,17 +35,24 @@ pub enum VdbApi {
     Initialized,
     NotRunning,
     StartCore,
+    /// 用于回应某些调试核心的请求
     CoreStarted,
+    /// 发送时内部包含None，回复时内部包含Some(regs)
     Register(Option<Registers>),
     WriteRegister(Regs, u64),
     DebugMode(DebugMode),
+    /// 获得当前正在执行的指令，发送时内部包含None，回复时内部包含Some(inst)
     Instruction(Option<u8>),
     Continue,
     Exit,
+    /// 一般情况下用这个变体回复
     Ok,
 }
 
 impl VdbApi {
+    /// ## 发送并获得vcore核心的回应
+    /// 
+    /// 此函数阻塞至vcore核心回复。
     pub fn get_result(&mut self, api: Self) -> &mut Self {
         *self = api;
         {
@@ -82,6 +92,9 @@ impl<'a> Debugger<'a> {
             .run(&mut self.debugging_core, self.debug_ports, &mut self.memory)
     }
 
+    /// ## 整理命令
+    /// 
+    /// 将命令整理成String数组
     fn disass(cmd: String) -> Vec<String> {
         let cmd = cmd.trim();
         cmd.split(" ")

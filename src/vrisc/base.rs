@@ -1,5 +1,6 @@
 use super::vcore::{BitOptions, ConditionCode, FlagRegFlag, InterruptId, Vcore, VcoreInstruction};
 
+/// ## 基本指令集
 pub const BASE: [Option<VcoreInstruction>; 64] = [
     Some((i_nop, 1)),
     Some((i_add, 3)),
