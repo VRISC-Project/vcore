@@ -16,7 +16,7 @@ pub struct Config {
     #[arg(short, long)]
     pub vrom: String,
 
-    /// 是否开启调试
+    /// 是否开启调试（在开启了debugger特性的版本中有效）
     #[arg(short, long, default_value_t = false)]
     pub debug: bool,
 

@@ -1,5 +1,3 @@
-use std::{cell::RefCell, rc::Rc};
-
 use crate::utils::memory::Memory;
 
 use super::base;
@@ -115,7 +113,7 @@ impl BitOptions for u64 {
 }
 
 /// vrisc寄存器
-#[derive(PartialEq, Clone, Copy)]
+#[derive(PartialEq, Clone, Copy, Debug)]
 pub struct Registers {
     pub x: [u64; 16],
     pub ip: u64,
@@ -220,7 +218,7 @@ impl InterruptController {
     }
 }
 
-#[derive(PartialEq, Clone, Copy)]
+#[derive(PartialEq, Clone, Copy, Debug)]
 pub enum DebugMode {
     None,
     Step,
@@ -231,7 +229,7 @@ pub struct Vcore {
     id: usize,
     total: usize,
     pub regs: Registers,
-    pub memory: Rc<RefCell<Memory>>,
+    pub memory: Memory,
     pub intctler: InterruptController,
     pub ip_increment: i64,
     pub instruction_space: [Option<VcoreInstruction>; 256],
@@ -241,7 +239,7 @@ pub struct Vcore {
 }
 
 impl Vcore {
-    pub fn new(id: usize, total_core: usize, memory: Rc<RefCell<Memory>>) -> Self {
+    pub fn new(id: usize, total_core: usize, memory: Memory) -> Self {
         Vcore {
             id,
             total: total_core,
@@ -278,7 +276,6 @@ impl Vcore {
             let target = self
                 .memory
                 .borrow()
-                .borrow()
                 .slice(self.regs.ivt + 8 * intid as u64, 8);
             let mut addr = 0u64;
             for i in 0..8 {
@@ -294,7 +291,7 @@ impl Vcore {
         }
     }
 
-    pub fn memory(&self) -> &Rc<RefCell<Memory>> {
+    pub fn memory(&self) -> &Memory {
         &self.memory
     }
 

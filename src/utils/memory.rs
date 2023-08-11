@@ -8,6 +8,7 @@ pub enum AddressError {
     WrongPrivilege,
 }
 
+#[derive(Debug, Clone)]
 pub struct Memory {
     memory: SharedPointer<u8>,
 }

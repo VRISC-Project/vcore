@@ -40,6 +40,7 @@ pub enum AssignError {
     IndexOutOfSize,
 }
 
+#[derive(Debug, Clone)]
 pub struct SharedPointer<T> {
     pub pointer: *mut T,
     size: usize,

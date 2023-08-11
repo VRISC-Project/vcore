@@ -5,6 +5,10 @@ edition = "2021"
 
 [dependencies]
 clap = { version = "4.3.11", features = ["derive"] }
+crossterm = { version = "0.26.1", features = ["event-stream"] }
 
 nix = "0.26.2"
 winapi = { version = "0.3.9", features = ["timeapi", "memoryapi", "processthreadsapi", "handleapi", "errhandlingapi"] }
+
+[features]
+debugger = []

@@ -1,20 +1,12 @@
 pub mod config;
-pub mod debug;
+pub mod debugger;
 pub mod utils;
 pub mod vrisc;
 
 use core::panic;
 #[cfg(target_os = "linux")]
 use nix::unistd;
-use std::{
-    cell::RefCell,
-    fs::File,
-    io::{BufRead, Read, Write},
-    process::exit,
-    rc::Rc,
-    thread,
-    time::Duration,
-};
+use std::{fs::File, io::Read, process::exit, thread, time::Duration};
 #[cfg(target_os = "windows")]
 use std::{mem::size_of, ptr::null_mut};
 #[cfg(target_os = "windows")]
@@ -25,15 +17,16 @@ use winapi::um::{
 };
 
 use config::Config;
-use debug::VdbApi;
+#[cfg(feature = "debugger")]
+use debugger::debug::{Debugger, Regs, VdbApi};
 use utils::{
     clock::Clock,
     memory::{AddressError, Memory},
     shared::SharedPointer,
 };
-use vrisc::vcore::{DebugMode, InterruptId, Vcore};
-
-use crate::debug::command_line;
+#[cfg(feature = "debugger")]
+use vrisc::vcore::DebugMode;
+use vrisc::vcore::{InterruptId, Vcore};
 
 pub fn run(config: Config) {
     #[cfg(target_os = "windows")]
@@ -50,10 +43,12 @@ pub fn run(config: Config) {
     let mut cores = Vec::new();
     let mut cores_startflg = Vec::new();
     let mut cores_inst_count = Vec::new();
+    #[cfg(feature = "debugger")]
     let mut cores_debug_port = Vec::new();
 
     let mut memory = Memory::new(config.memory);
     {
+        // 加载vrom
         let rom = match File::open(config.vrom) {
             Ok(rom) => rom,
             Err(err) => panic!("{}", err),
@@ -71,8 +66,10 @@ pub fn run(config: Config) {
             .push(SharedPointer::<bool>::new(format!("VcoreCore{}StartFlg", i), 1).unwrap());
         cores_inst_count
             .push(SharedPointer::<u64>::new(format!("VcoreCore{}InstCount", i), 1).unwrap());
+        #[cfg(feature = "debugger")]
         cores_debug_port
             .push(SharedPointer::<VdbApi>::new(format!("VcoreCore{}DebugApi", i), 1).unwrap());
+        #[cfg(feature = "debugger")]
         cores_debug_port[i].write(0, VdbApi::None);
 
         if i == 0 && !config.debug {
@@ -170,50 +167,13 @@ pub fn run(config: Config) {
         {}
     }
 
-    let mut stdin = std::io::BufReader::new(std::io::stdin());
-    let mut stdout = std::io::BufWriter::new(std::io::stdout());
-    if config.debug {
-        for db in cores_debug_port.as_mut_slice() {
-            while *db.at(0) != VdbApi::Initialized {
-                // 在release模式中，这个循环会被优化成死循环，必须在
-                // 循环里做点io操作，让它不被优化成死循环。
-                // 相当于手动同步共享变量
-                stdout.flush().unwrap();
-            }
-            *db.at_mut(0) = VdbApi::None;
-        }
-        print!("\nType \'help\' to learn useage.\n\x1b[34mvdb >\x1b[0m ");
-        stdout.flush().unwrap();
-    }
-    loop {
-        thread::sleep(Duration::from_micros(1));
-        // debug信息输入输出机制
-        // 命令提示符及终端输入等操作由如下代码进行，command_line()函数只负责处理
-        // 输入的命令以及对vcore虚拟机对应的状态进行修改和查询。
+    #[cfg(feature = "debugger")]
+    let mut debugger = Debugger::new(config.memory, &mut cores_debug_port);
+    let mut running = true;
+    while running {
+        #[cfg(feature = "debugger")]
         if config.debug {
-            if let Some(cmd) = {
-                let buffer = stdin.fill_buf().unwrap();
-                if buffer.len() == 0 {
-                    None
-                } else {
-                    let mut cmd = String::new();
-                    stdin.read_line(&mut cmd).unwrap();
-                    Some(cmd.trim().to_string())
-                }
-            } {
-                let result = command_line(&cmd, &mut memory, &mut cores_debug_port);
-                if result == "exit" {
-                    for db in cores_debug_port.as_mut_slice() {
-                        db.at_mut(0).get_result(VdbApi::Exit);
-                    }
-                    break;
-                }
-                if !result.is_empty() {
-                    println!("{}", result);
-                }
-                print!("\x1b[34mvdb >\x1b[0m ");
-                stdout.flush().unwrap();
-            }
+            running = debugger.run();
         }
     }
 }
@@ -225,14 +185,14 @@ fn vcore(memory_size: usize, id: usize, total_core: usize, debug: bool, external
     // 用于vcore父进程统计执行速度等
     let mut core_instruction_count =
         SharedPointer::<u64>::bind(format!("VcoreCore{}InstCount", id), 1).unwrap();
-    let core_debug_port =
-        SharedPointer::<VdbApi>::bind(format!("VcoreCore{}DebugApi", id), 1).unwrap();
 
-    let memory = Memory::bind(memory_size);
-    let memory = Rc::new(RefCell::new(memory));
-    let mut core = Vcore::new(id, total_core, Rc::clone(&memory));
+    let mut core = Vcore::new(id, total_core, Memory::bind(memory_size));
     core.init();
 
+    #[cfg(feature = "debugger")]
+    let core_debug_port =
+        SharedPointer::<VdbApi>::bind(format!("VcoreCore{}DebugApi", id), 1).unwrap();
+    #[cfg(feature = "debugger")]
     if debug {
         *core_debug_port.at_mut(0) = VdbApi::Initialized;
     }
@@ -241,6 +201,7 @@ fn vcore(memory_size: usize, id: usize, total_core: usize, debug: bool, external
         //等待核心被允许开始
         thread::sleep(Duration::from_millis(1));
 
+        #[cfg(feature = "debugger")]
         if debug {
             match *core_debug_port.at(0) {
                 VdbApi::Initialized => continue,
@@ -292,18 +253,14 @@ fn vcore(memory_size: usize, id: usize, total_core: usize, debug: bool, external
         if let Some(intid) = core.intctler.interrupted() {
             core.interrupt_jump(intid);
         }
-        
+
         // 指令寻址，更新hot_ip
         if (!core.transferred && hot_ip % (16 * 1024) == 0) || debug {
             core.regs.ip += core.ip_increment as u64;
             core.ip_increment = 0;
         }
         if core.transferred || hot_ip % (16 * 1024) == 0 || crossed_page {
-            hot_ip = match core
-                .memory
-                .borrow_mut()
-                .address(core.regs.ip, core.regs.flag)
-            {
+            hot_ip = match core.memory.address(core.regs.ip, core.regs.flag) {
                 Ok(address) => address,
                 Err(error) => match error {
                     AddressError::OverSized(address) => {
@@ -322,6 +279,8 @@ fn vcore(memory_size: usize, id: usize, total_core: usize, debug: bool, external
             crossed_page = false;
         }
 
+        // debugger后端
+        #[cfg(feature = "debugger")]
         if debug {
             match *core_debug_port.at(0) {
                 VdbApi::Exit => break,
@@ -330,16 +289,16 @@ fn vcore(memory_size: usize, id: usize, total_core: usize, debug: bool, external
                 }
                 VdbApi::WriteRegister(register, value) => {
                     match register {
-                        debug::Regs::X(uni) => core.regs.x[uni] = value,
-                        debug::Regs::Ip => core.regs.ip = value,
-                        debug::Regs::Flag => core.regs.flag = value,
-                        debug::Regs::Ivt => core.regs.ivt = value,
-                        debug::Regs::Kpt => core.regs.kpt = value,
-                        debug::Regs::Upt => core.regs.upt = value,
-                        debug::Regs::Scp => core.regs.scp = value,
-                        debug::Regs::Imsg => core.regs.imsg = value,
-                        debug::Regs::IpDump => core.regs.ipdump = value,
-                        debug::Regs::FlagDump => core.regs.flagdump = value,
+                        Regs::X(uni) => core.regs.x[uni] = value,
+                        Regs::Ip => core.regs.ip = value,
+                        Regs::Flag => core.regs.flag = value,
+                        Regs::Ivt => core.regs.ivt = value,
+                        Regs::Kpt => core.regs.kpt = value,
+                        Regs::Upt => core.regs.upt = value,
+                        Regs::Scp => core.regs.scp = value,
+                        Regs::Imsg => core.regs.imsg = value,
+                        Regs::IpDump => core.regs.ipdump = value,
+                        Regs::FlagDump => core.regs.flagdump = value,
                         _ => (),
                     }
                     *core_debug_port.at_mut(0) = VdbApi::Ok;
@@ -351,7 +310,7 @@ fn vcore(memory_size: usize, id: usize, total_core: usize, debug: bool, external
                 }
                 VdbApi::Instruction(None) => {
                     *core_debug_port.at_mut(0) =
-                        VdbApi::Instruction(Some(*core.memory.borrow().borrow().at(hot_ip)))
+                        VdbApi::Instruction(Some(*core.memory.borrow().at(hot_ip)))
                 }
                 _ => (),
             }
@@ -375,7 +334,7 @@ fn vcore(memory_size: usize, id: usize, total_core: usize, debug: bool, external
         core_instruction_count.write(0, count);
 
         /* 取指令 */
-        let opcode = *core.memory.borrow().borrow().at(hot_ip);
+        let opcode = *core.memory.borrow().at(hot_ip);
         // 这里有个例外
         // opcode=0x3d,0x3e分别是initext和destext指令
         // 目前不予支持
@@ -401,17 +360,13 @@ fn vcore(memory_size: usize, id: usize, total_core: usize, debug: bool, external
                 || inst_end == inst_end & 0xffff_ffff_ffff_c000
             {
                 //指令未跨页
-                core.memory().borrow().borrow().slice(hot_ip, instlen)
+                core.memory().borrow().slice(hot_ip, instlen)
             } else {
                 //指令跨页
                 let firstl = inst_end & 0xffff_ffff_ffff_c000 - inst_st;
                 let lastl = inst_end - inst_end & 0xffff_ffff_ffff_c000;
-                inst.copy_from_slice(core.memory().borrow().borrow().slice(inst_st, firstl));
-                let last_st = match core
-                    .memory
-                    .borrow_mut()
-                    .address(core.regs.ip + firstl, core.regs.flag)
-                {
+                inst.copy_from_slice(core.memory().borrow().slice(inst_st, firstl));
+                let last_st = match core.memory.address(core.regs.ip + firstl, core.regs.flag) {
                     Ok(address) => address,
                     Err(error) => match error {
                         AddressError::OverSized(address) => {
@@ -426,14 +381,7 @@ fn vcore(memory_size: usize, id: usize, total_core: usize, debug: bool, external
                         }
                     },
                 };
-                inst.append(
-                    &mut core
-                        .memory()
-                        .borrow()
-                        .borrow()
-                        .slice_mut(last_st, lastl)
-                        .to_vec(),
-                );
+                inst.append(&mut core.memory().borrow().slice_mut(last_st, lastl).to_vec());
                 crossed_page = true;
                 inst.as_slice()
             }

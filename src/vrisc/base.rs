@@ -678,7 +678,7 @@ pub fn i_ldi(inst: &[u8], core: &mut Vcore) -> u64 {
 
 pub fn i_ldm(inst: &[u8], core: &mut Vcore) -> u64 {
     let src = core.regs.x[inst[1].lower() as usize];
-    let src = core.memory().borrow().borrow().slice(src, 8);
+    let src = core.memory().borrow().slice(src, 8);
     let src = (src[0] as u64)
         | ((src[1] as u64) << 8)
         | ((src[2] as u64) << 16)
@@ -739,8 +739,7 @@ pub fn i_stm(inst: &[u8], core: &mut Vcore) -> u64 {
         }
         _ => vec![],
     };
-    core.memory()
-        .borrow_mut()
+    core.memory
         .borrow_mut()
         .write_slice(core.regs.x[inst[1].higher() as usize], &src);
     core.regs.flag.mark_symbol(
@@ -861,10 +860,10 @@ pub fn i_cpuid(_inst: &[u8], core: &mut Vcore) -> u64 {
         3 => {
             let mut i = 0usize;
             let tar = core.regs.x[1];
-            while *core.memory().borrow().borrow().at(tar + i as u64) != 0 {
+            while *core.memory().borrow().at(tar + i as u64) != 0 {
                 i += 1;
             }
-            let s = core.memory().borrow().borrow().slice(tar, i as u64);
+            let s = core.memory().borrow().slice(tar, i as u64);
             let s = String::from_utf8_lossy(s).to_string();
             println!("{}", s);
         }
