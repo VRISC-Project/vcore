@@ -23,6 +23,12 @@ ldi $0, %x0
     nop
 loop %x0, *p
 
+section .data
+
+#time
+
+dq $0
+
 section .text.irh align=8
 
 // 中断处理程序（Interrupt Request Handlers）
@@ -37,6 +43,12 @@ ir $1
 
 #clock
 ei
+
+ldi *.data.time, %x1
+ldm %x1, %x2
+inc %x2
+stm %x2, %x1
+
 ir $1
 
 #invalid_inst
