@@ -15,11 +15,11 @@ use super::debug::{Debugger, VdbApi};
 
 #[derive(Debug)]
 /// ## 终端
-/// 
+///
 /// 为vcore debugger提供的一个shell
-/// 
+///
 /// 实现了如下功能：
-/// 
+///
 /// * `backspace`删除光标前的字符
 /// * `delete`删除光标后的字符
 /// * 左右键移动光标
@@ -49,19 +49,38 @@ impl Terminal {
         }
     }
 
+    pub fn none() -> Self {
+        Self {
+            cmd: String::new(),
+            cursor: 0,
+            stdout: std::io::stdout(),
+            history: vec![],
+            cmd_index: 0,
+            typed: false,
+        }
+    }
+
     /// ## 打印命令提示符
-    /// 
+    ///
     /// 如果有正在调试的核心，在命令提示符中体现
     pub fn prompt(&mut self, debugging_core: Option<usize>) {
+        execute!(self.stdout, SetForegroundColor(Color::Blue), Print("vdb"),).unwrap();
         if let Some(core) = debugging_core {
+            execute!(
+                self.stdout,
+                SetForegroundColor(Color::DarkGrey),
+                Print("#"),
+                ResetColor,
+                Print(" "),
+            )
+            .unwrap();
             execute!(self.stdout, SetForegroundColor(Color::Green)).unwrap();
             write!(self.stdout, "{}", core).unwrap();
-            execute!(self.stdout, SetForegroundColor(Color::Grey), Print("#")).unwrap();
         }
         execute!(
             self.stdout,
             SetForegroundColor(Color::Blue),
-            Print("vdb>"),
+            Print(">"),
             ResetColor,
             Print(" ")
         )
@@ -70,7 +89,7 @@ impl Terminal {
     }
 
     /// ## 新的一行
-    /// 
+    ///
     /// 此函数只会在raw模式中将光标移到行首，
     /// 换行符需要自己输出。
     pub fn newline(stdout: &mut Stdout) {

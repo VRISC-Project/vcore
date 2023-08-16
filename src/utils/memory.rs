@@ -14,21 +14,18 @@ pub enum AddressError {
 /// 专门用于vcore
 pub struct Memory {
     memory: SharedPointer<u8>,
-    refcount: usize,
 }
 
 impl Memory {
     pub fn new(memory: usize) -> Self {
         Memory {
             memory: SharedPointer::new("VcoreVriscMainMemory".to_string(), memory).unwrap(),
-            refcount: 0,
         }
     }
 
     pub fn bind(memory: usize) -> Self {
         Memory {
             memory: SharedPointer::bind("VcoreVriscMainMemory".to_string(), memory).unwrap(),
-            refcount: 0,
         }
     }
 

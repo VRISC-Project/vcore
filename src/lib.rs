@@ -4,6 +4,8 @@ pub mod utils;
 pub mod vrisc;
 
 use core::panic;
+#[cfg(feature = "debugger")]
+use debugger::debug::DebuggerBackend;
 #[cfg(target_os = "linux")]
 use nix::unistd;
 use std::{fs::File, io::Read, process::exit, thread, time::Duration};
@@ -18,28 +20,22 @@ use winapi::um::{
 
 use config::Config;
 #[cfg(feature = "debugger")]
-use debugger::debug::{Debugger, Regs, VdbApi};
-use utils::{
-    clock::Clock,
-    memory::{AddressError, Memory},
-    shared::SharedPointer,
-};
-#[cfg(feature = "debugger")]
-use vrisc::vcore::DebugMode;
+use debugger::debug::{Debugger, VdbApi};
+use utils::{clock::Clock, memory::Memory, shared::SharedPointer};
 use vrisc::vcore::{InterruptId, Vcore};
 
 /// # vcore从这里开始运行
-/// 
+///
 /// 创建内存、创建vcore核心，在debugger特性打开时创建debugger。
-/// 
+///
 /// 每个vcore核心都运行在不同进程中，通过SharedPointer共享内存实现进程间通信。
-/// 
+///
 /// ## 在linux上
-/// 
+///
 /// 使用fork创建vcore核心。
-/// 
+///
 /// ## 在windows上
-/// 
+///
 /// 由于windows上没有与fork效果类似的函数，因此在Config中添加了两个参数用于表示
 /// 这是一个vcore核心进程以及传递此核心的core id。
 /// 在windows平台上会首先检测此参数是否存在并跳至vcore运行，
@@ -184,9 +180,14 @@ pub fn run(config: Config) {
     }
 
     #[cfg(feature = "debugger")]
-    let mut debugger = Debugger::new(config.memory, &mut cores_debug_port);
+    let mut debugger = if config.debug {
+        Debugger::new(config.memory, &mut cores_debug_port)
+    } else {
+        Debugger::none(&mut cores_debug_port)
+    };
     let mut running = true;
     while running {
+        thread::sleep(Duration::from_millis(1));
         #[cfg(feature = "debugger")]
         if config.debug {
             running = debugger.run();
@@ -194,10 +195,10 @@ pub fn run(config: Config) {
     }
 }
 
-/// ## vcore核心
-/// 
+/// ## vcore核心函数
+///
 /// 首先绑定内存和与主进程通信的共享内存，然后等待核心被打开，最后进入核心主循环。
-/// 
+///
 /// 由于debugger的存在，执行一条指令的过程并没有在这里完全体现出来。
 fn vcore(memory_size: usize, id: usize, total_core: usize, debug: bool, external_clock: bool) {
     let mut core_startflg =
@@ -206,17 +207,13 @@ fn vcore(memory_size: usize, id: usize, total_core: usize, debug: bool, external
     // 用于vcore父进程统计执行速度等
     let mut core_instruction_count =
         SharedPointer::<u64>::bind(format!("VcoreCore{}InstCount", id), 1).unwrap();
-
+    core_instruction_count.write(0, u64::MAX);
+    // vcore核心
     let mut core = Vcore::new(id, total_core, Memory::bind(memory_size));
     core.init();
-
     #[cfg(feature = "debugger")]
-    let core_debug_port =
-        SharedPointer::<VdbApi>::bind(format!("VcoreCore{}DebugApi", id), 1).unwrap();
-    #[cfg(feature = "debugger")]
-    if debug {
-        *core_debug_port.at_mut(0) = VdbApi::Initialized;
-    }
+    // vcore debugger后端
+    let mut debugger_backend = DebuggerBackend::new(id);
 
     while !*core_startflg.at(0) {
         // 等待核心被允许开始
@@ -224,143 +221,57 @@ fn vcore(memory_size: usize, id: usize, total_core: usize, debug: bool, external
 
         #[cfg(feature = "debugger")]
         if debug {
-            match *core_debug_port.at(0) {
-                VdbApi::Initialized => continue,
-                VdbApi::StartCore => {
-                    core_startflg.write(0, true);
-                    *core_debug_port.at_mut(0) = VdbApi::Ok;
-                }
-                VdbApi::Exit => break,
-                VdbApi::DebugMode(mode) => {
-                    core.debug_mode = mode;
-                    *core_debug_port.at_mut(0) = VdbApi::Ok;
-                }
-                _ => *core_debug_port.at_mut(0) = VdbApi::NotRunning,
-            }
-            // *core_debug_port.at_mut(0) = VdbApi::None;
+            match debugger_backend.before_start(&mut core_startflg, &mut core.debug_mode) {
+                Some(true) => continue,
+                None => break,
+                _ => (),
+            };
         }
     }
 
-    /*
-    hot_ip时栈上储存的ip寄存器的寻址后值，只有这个值每运行一次指令改变一次。
-    此ip不重新寻址，因为在一个页内，物理地址与线性地址一一对应。
-    满足如下条件时，hot_ip同步至core.regs.ip：
-        产生转移：需要将ip（中断转移还需flag）转存至dump寄存器
-    满足如下条件时，重新为hot_ip寻址：
-        产生转移：转移很可能导致ip不在此页中
-        遇到最小页边界：此时地址大概率不在同一页中。“大概率”指有时分页会有
-            大页，在大页中的较小页边界两侧的内存都在同一页中，但是由于最小页
-            有16KB，遇到最小页边界的概率也不大，判断一个最小页边界是否是此页S
-            的边界会消耗更多时间（这得从顶级页表开始一级一级地查才能查到）。
-
-    在此顺便说明，core.ip_increment是自core.regs.ip被同步以来的总increment
-     */
-    let mut hot_ip = 0;
-
-    let mut crossed_page = false;
-
     // 内部时钟 (250Hz)
     let mut clock = Clock::new(4);
-
-    core_instruction_count.write(0, u64::MAX);
 
     loop {
         // 执行时钟
         if !debug && !external_clock && clock.hit() {
             core.intctler.interrupt(InterruptId::Clock);
         }
-
         // 检测中断
         if let Some(intid) = core.intctler.interrupted() {
             core.interrupt_jump(intid);
         }
-
         // 指令寻址，更新hot_ip
-        if (!core.transferred && hot_ip % (16 * 1024) == 0) || debug {
-            core.regs.ip += core.ip_increment as u64;
-            core.ip_increment = 0;
+        if core.flush_lazy_address_system(debug) {
+            continue;
         }
-        if core.transferred || hot_ip % (16 * 1024) == 0 || crossed_page {
-            hot_ip = match core.memory.address(core.regs.ip, core.regs.flag) {
-                Ok(address) => address,
-                Err(error) => match error {
-                    AddressError::OverSized(address) => {
-                        core.intctler.interrupt(InterruptId::InaccessibleAddress);
-                        core.regs.imsg = address;
-                        continue;
-                    }
-                    AddressError::WrongPrivilege => {
-                        core.intctler.interrupt(InterruptId::WrongPrivilege);
-                        core.regs.imsg = core.regs.ip;
-                        continue;
-                    }
-                },
-            };
-            core.transferred = false;
-            crossed_page = false;
-        }
-
         // debugger后端
         #[cfg(feature = "debugger")]
         if debug {
-            match *core_debug_port.at(0) {
-                VdbApi::Exit => break,
-                VdbApi::Register(None) => {
-                    *core_debug_port.at_mut(0) = VdbApi::Register(Some(core.regs.clone()));
-                }
-                VdbApi::WriteRegister(register, value) => {
-                    match register {
-                        Regs::X(uni) => core.regs.x[uni] = value,
-                        Regs::Ip => core.regs.ip = value,
-                        Regs::Flag => core.regs.flag = value,
-                        Regs::Ivt => core.regs.ivt = value,
-                        Regs::Kpt => core.regs.kpt = value,
-                        Regs::Upt => core.regs.upt = value,
-                        Regs::Scp => core.regs.scp = value,
-                        Regs::Imsg => core.regs.imsg = value,
-                        Regs::IpDump => core.regs.ipdump = value,
-                        Regs::FlagDump => core.regs.flagdump = value,
-                        _ => (),
-                    }
-                    *core_debug_port.at_mut(0) = VdbApi::Ok;
-                }
-                VdbApi::StartCore => *core_debug_port.at_mut(0) = VdbApi::CoreStarted,
-                VdbApi::DebugMode(mode) => {
-                    core.debug_mode = mode;
-                    *core_debug_port.at_mut(0) = VdbApi::Ok;
-                }
-                VdbApi::Instruction(None) => {
-                    *core_debug_port.at_mut(0) =
-                        VdbApi::Instruction(Some(*core.memory.borrow().at(hot_ip)))
-                }
+            match debugger_backend.after_start(
+                core.lazyaddr.hot_ip,
+                &mut core.regs,
+                &mut core.debug_mode,
+                &mut core.memory,
+            ) {
+                Some(true) => continue,
+                None => break,
                 _ => (),
-            }
-            if core.debug_mode == DebugMode::Step {
-                if let VdbApi::Continue = *core_debug_port.at(0) {
-                    *core_debug_port.at_mut(0) = VdbApi::Ok;
-                } else {
-                    thread::sleep(Duration::from_millis(1));
-                    continue;
-                }
-            }
+            };
         }
-
+        // nop指令状态下，在此停止
         if core.nopflag {
             thread::sleep(Duration::from_micros(1));
             continue;
         }
-
         // 更新指令计数
         let count = (*core_instruction_count.at(0)).wrapping_add(1);
         core_instruction_count.write(0, count);
-
         /* 取指令 */
-        let opcode = *core.memory.borrow().at(hot_ip);
-        // 这里有个例外
+        let opcode = *core.memory.borrow().at(core.lazyaddr.hot_ip);
         // opcode=0x3d,0x3e分别是initext和destext指令
         // 目前不予支持
-        // 等项目成熟之后再添加这两个指令
-        // 现在这两个指令依然会产生InvalidInstruction
+        // 这两个指令依然会产生InvalidInstruction
         // TODO
         // 添加指令执行内容需在base.rs中实现，并加入到指令空间中
         if let None = core.instruction_space[opcode as usize] {
@@ -368,49 +279,11 @@ fn vcore(memory_size: usize, id: usize, total_core: usize, debug: bool, external
             continue;
         }
         let instlen = core.instruction_space[opcode as usize].unwrap().1;
-        // 读取指令，首先判断指令是否跨越最小页边界
-        // 若指令跨越最小页边界
-        // 对下一个页起始地址寻址
-        // 分成前后两部分读取
-        let mut inst = Vec::new();
-        let inst = {
-            core.regs.ip += core.ip_increment as u64; //恰好在此更新core.regs.ip，寻址失败可以在此中断
-            let inst_st = hot_ip; //最后14位为0
-            let inst_end = hot_ip + instlen;
-            if inst_st & 0xffff_ffff_ffff_c000 == inst_end & 0xffff_ffff_ffff_c000
-                || inst_end == inst_end & 0xffff_ffff_ffff_c000
-            {
-                //指令未跨页
-                core.memory().borrow().slice(hot_ip, instlen)
-            } else {
-                //指令跨页
-                let firstl = inst_end & 0xffff_ffff_ffff_c000 - inst_st;
-                let lastl = inst_end - inst_end & 0xffff_ffff_ffff_c000;
-                inst.copy_from_slice(core.memory().borrow().slice(inst_st, firstl));
-                let last_st = match core.memory.address(core.regs.ip + firstl, core.regs.flag) {
-                    Ok(address) => address,
-                    Err(error) => match error {
-                        AddressError::OverSized(address) => {
-                            core.intctler.interrupt(InterruptId::InaccessibleAddress);
-                            core.regs.imsg = address;
-                            continue;
-                        }
-                        AddressError::WrongPrivilege => {
-                            core.intctler.interrupt(InterruptId::WrongPrivilege);
-                            core.regs.imsg = core.regs.ip;
-                            continue;
-                        }
-                    },
-                };
-                inst.append(&mut core.memory().borrow().slice_mut(last_st, lastl).to_vec());
-                crossed_page = true;
-                inst.as_slice()
-            }
-        };
-
+        let (inst, cont) = core.read_instruction(instlen);
+        if cont {
+            continue;
+        }
         /* 执行指令 */
-        let movement = core.instruction_space[opcode as usize].unwrap().0(inst, &mut core);
-        core.ip_increment += movement as i64;
-        hot_ip += movement;
+        core.execute_instruction(opcode, inst.as_slice());
     }
 }

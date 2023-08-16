@@ -1,4 +1,4 @@
-use crate::utils::memory::Memory;
+use crate::utils::memory::{AddressError, Memory};
 
 use super::base;
 
@@ -229,6 +229,36 @@ pub enum DebugMode {
     Step,
 }
 
+/// ## 惰性寻址系统
+/// hot_ip时栈上储存的ip寄存器的寻址后值，只有这个值每运行一次指令改变一次。
+///
+/// 此ip不重新寻址，因为在一个页内，物理地址与线性地址一一对应。
+///
+/// 满足如下条件时，hot_ip同步至core.regs.ip：
+/// * 产生转移：需要将ip（中断转移还需flag）转存至dump寄存器
+/// 满足如下条件时，重新为hot_ip寻址：
+/// * 产生转移：转移很可能导致ip不在此页中
+/// * 遇到最小页边界：此时地址大概率不在同一页中。“大概率”指有时分页会有大页，在大页中的较小页边界两侧的内存
+///         都在同一页中，但是由于最小页有16KB，遇到最小页边界的概率也不大，判断一个最小页边界是否是此页
+///         的边界会消耗更多时间（这得从顶级页表开始一级一级地查才能查到）。
+///
+/// 在此顺便说明，core.ip_increment是自core.regs.ip被同步以来的总increment
+pub struct LazyAddress {
+    pub hot_ip: u64,
+    pub had_run_inst: bool,
+    pub crossed_page: bool,
+}
+
+impl LazyAddress {
+    pub fn new() -> Self {
+        Self {
+            hot_ip: 0,
+            had_run_inst: false,
+            crossed_page: false,
+        }
+    }
+}
+
 /// vcore核心
 pub struct Vcore {
     id: usize,
@@ -237,6 +267,7 @@ pub struct Vcore {
     pub regs: Registers,
     pub memory: Memory,
     pub intctler: InterruptController,
+    pub lazyaddr: LazyAddress,
 
     /// ## ip增量
     ///
@@ -281,6 +312,7 @@ impl Vcore {
             regs: Registers::new(),
             memory,
             intctler: InterruptController::new(),
+            lazyaddr: LazyAddress::new(),
             ip_increment: 0,
             instruction_space: [None; 256],
             transferred: true,
@@ -294,9 +326,15 @@ impl Vcore {
         self.instruction_space[..64].copy_from_slice(&base::BASE);
     }
 
-    
+    pub fn execute_instruction(&mut self, opcode: u8, inst: &[u8]) {
+        let movement = self.instruction_space[opcode as usize].unwrap().0(inst, self);
+        self.ip_increment += movement as i64;
+        self.lazyaddr.hot_ip += movement;
+        self.lazyaddr.had_run_inst = true;
+    }
+
     /// ## 中断跳转
-    /// 
+    ///
     /// 当发生中断时，dump寄存器转存ip与flag寄存器状态，进入内核态，
     /// 关闭中断，ip跳转，中断控制器复位
     pub fn interrupt_jump(&mut self, intid: InterruptId) {
@@ -347,9 +385,9 @@ impl Vcore {
     }
 
     /// ## 特权级检查
-    /// 
+    ///
     /// 只需在特权指令中调用
-    /// 
+    ///
     /// 若权限不符，产生中断
     pub fn privilege_test(&mut self) -> bool {
         if self.regs.flag.bit_get(FlagRegFlag::Privilege) {
@@ -357,6 +395,97 @@ impl Vcore {
             false
         } else {
             true
+        }
+    }
+
+    /// ## 刷新惰性寻址系统
+    ///
+    /// ### 返回值
+    ///
+    /// 如果产生了中断需要停止接下来的步骤，从头开始
+    ///
+    /// 用返回true表示这种情况
+    pub fn flush_lazy_address_system(&mut self, debug: bool) -> bool {
+        if (!self.transferred && self.lazyaddr.hot_ip % (16 * 1024) == 0) || debug {
+            if self.lazyaddr.had_run_inst {
+                self.regs.ip += self.ip_increment as u64;
+                self.ip_increment = 0;
+                self.lazyaddr.had_run_inst = false;
+            }
+        }
+        if self.transferred || self.lazyaddr.hot_ip % (16 * 1024) == 0 || self.lazyaddr.crossed_page
+        {
+            self.lazyaddr.hot_ip = match self.memory.address(self.regs.ip, self.regs.flag) {
+                Ok(address) => address,
+                Err(error) => match error {
+                    AddressError::OverSized(address) => {
+                        self.intctler.interrupt(InterruptId::InaccessibleAddress);
+                        self.regs.imsg = address;
+                        return true;
+                    }
+                    AddressError::WrongPrivilege => {
+                        self.intctler.interrupt(InterruptId::WrongPrivilege);
+                        self.regs.imsg = self.regs.ip;
+                        return true;
+                    }
+                },
+            };
+            self.transferred = false;
+            self.lazyaddr.crossed_page = false;
+        }
+        false
+    }
+
+    /// ## 读取指令
+    /// 先判断指令是否跨越最小页边界
+    ///
+    /// 若指令跨越最小页边界，对下一个页起始地址寻址，分成前后两部分读取
+    ///
+    /// ### 返回值
+    ///
+    /// 如果产生了中断需要停止接下来的步骤，从头开始
+    ///
+    /// 用返回true表示这种情况
+    pub fn read_instruction(&mut self, instlen: u64) -> (Vec<u8>, bool) {
+        let mut inst = Vec::new();
+        self.regs.ip += self.ip_increment as u64; //恰好在此更新self.regs.ip，寻址失败可以在此中断
+        self.ip_increment = 0;
+        let inst_st = self.lazyaddr.hot_ip; //最后14位为0
+        let inst_end = self.lazyaddr.hot_ip + instlen;
+        if inst_st & 0xffff_ffff_ffff_c000 == inst_end & 0xffff_ffff_ffff_c000
+            || inst_end == inst_end & 0xffff_ffff_ffff_c000
+        {
+            //指令未跨页
+            (
+                self.memory()
+                    .borrow()
+                    .slice(self.lazyaddr.hot_ip, instlen)
+                    .to_vec(),
+                false,
+            )
+        } else {
+            //指令跨页
+            let firstl = inst_end & 0xffff_ffff_ffff_c000 - inst_st;
+            let lastl = inst_end - inst_end & 0xffff_ffff_ffff_c000;
+            inst.copy_from_slice(self.memory().borrow().slice(inst_st, firstl));
+            let last_st = match self.memory.address(self.regs.ip + firstl, self.regs.flag) {
+                Ok(address) => address,
+                Err(error) => match error {
+                    AddressError::OverSized(address) => {
+                        self.intctler.interrupt(InterruptId::InaccessibleAddress);
+                        self.regs.imsg = address;
+                        return (Vec::new(), true);
+                    }
+                    AddressError::WrongPrivilege => {
+                        self.intctler.interrupt(InterruptId::WrongPrivilege);
+                        self.regs.imsg = self.regs.ip;
+                        return (Vec::new(), true);
+                    }
+                },
+            };
+            inst.append(&mut self.memory().borrow().slice_mut(last_st, lastl).to_vec());
+            self.lazyaddr.crossed_page = true;
+            (inst, false)
         }
     }
 }
