@@ -191,6 +191,7 @@ impl DebuggerBackend {
         res
     }
 
+    #[inline]
     /// ## 调试器后端
     ///
     /// 在核心开启前使用
@@ -225,6 +226,7 @@ impl DebuggerBackend {
         }
     }
 
+    #[inline]
     /// ## 调试器后端
     ///
     /// 在核心开启后使用

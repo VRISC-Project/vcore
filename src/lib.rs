@@ -207,7 +207,7 @@ fn vcore(memory_size: usize, id: usize, total_core: usize, debug: bool, external
     // 用于vcore父进程统计执行速度等
     let mut core_instruction_count =
         SharedPointer::<u64>::bind(format!("VcoreCore{}InstCount", id), 1).unwrap();
-    core_instruction_count.write(0, u64::MAX);
+    core_instruction_count.write(0, 0);
     // vcore核心
     let mut core = Vcore::new(id, total_core, Memory::bind(memory_size));
     core.init();
@@ -264,9 +264,6 @@ fn vcore(memory_size: usize, id: usize, total_core: usize, debug: bool, external
             thread::sleep(Duration::from_micros(1));
             continue;
         }
-        // 更新指令计数
-        let count = (*core_instruction_count.at(0)).wrapping_add(1);
-        core_instruction_count.write(0, count);
         /* 取指令 */
         let opcode = *core.memory.borrow().at(core.lazyaddr.hot_ip);
         // opcode=0x3d,0x3e分别是initext和destext指令
@@ -285,5 +282,7 @@ fn vcore(memory_size: usize, id: usize, total_core: usize, debug: bool, external
         }
         /* 执行指令 */
         core.execute_instruction(opcode, inst.as_slice());
+        // 更新指令计数
+        *core_instruction_count.at_mut(0) += 1;
     }
 }

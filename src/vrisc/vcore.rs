@@ -326,6 +326,7 @@ impl Vcore {
         self.instruction_space[..64].copy_from_slice(&base::BASE);
     }
 
+    #[inline]
     pub fn execute_instruction(&mut self, opcode: u8, inst: &[u8]) {
         let movement = self.instruction_space[opcode as usize].unwrap().0(inst, self);
         self.ip_increment += movement as i64;
@@ -333,6 +334,7 @@ impl Vcore {
         self.lazyaddr.had_run_inst = true;
     }
 
+    #[inline]
     /// ## 中断跳转
     ///
     /// 当发生中断时，dump寄存器转存ip与flag寄存器状态，进入内核态，
@@ -398,6 +400,7 @@ impl Vcore {
         }
     }
 
+    #[inline]
     /// ## 刷新惰性寻址系统
     ///
     /// ### 返回值
@@ -436,6 +439,7 @@ impl Vcore {
         false
     }
 
+    #[inline]
     /// ## 读取指令
     /// 先判断指令是否跨越最小页边界
     ///
