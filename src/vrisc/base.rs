@@ -1,3 +1,5 @@
+use crate::utils::memory::ReadWrite;
+
 use super::vcore::{BitOptions, ConditionCode, FlagRegFlag, InterruptId, Vcore, VcoreInstruction};
 
 /// ## 基本指令集
@@ -679,6 +681,45 @@ pub fn i_ldi(inst: &[u8], core: &mut Vcore) -> u64 {
 
 pub fn i_ldm(inst: &[u8], core: &mut Vcore) -> u64 {
     let src = core.regs.x[inst[1].lower() as usize];
+    let src = match core.memory.address(
+        src,
+        core.regs.flag,
+        core.regs.kpt,
+        core.regs.upt,
+        ReadWrite::Read,
+    ) {
+        Ok(addr) => addr,
+        Err(err) => match err {
+            crate::utils::memory::AddressError::OverSized(addr) => {
+                core.intctler.interrupt(InterruptId::InaccessibleAddress);
+                core.regs.imsg = addr;
+                // 无法访问的内存的情况下，要么地址超过内存大小，要么页被交换
+                // 因此要么处理之后重新运行，要么进程直接停止
+                // 所以返回0即可
+                return 0;
+            }
+            crate::utils::memory::AddressError::WrongPrivilege => {
+                core.intctler.interrupt(InterruptId::WrongPrivilege);
+                core.regs.imsg = src;
+                // 跨特权级访问，无法恢复
+                // 程序直接停止，不能继续运行
+                return 0;
+            }
+            crate::utils::memory::AddressError::Unreadable => {
+                core.intctler.interrupt(InterruptId::PageOrTableUnreadable);
+                core.regs.imsg = core.regs.imsg;
+                return 0;
+            }
+            crate::utils::memory::AddressError::Unwritable => {
+                panic!("出现了意外情况，在读寻址时返回了不可写错误")
+            }
+            crate::utils::memory::AddressError::Ineffective => {
+                core.intctler.interrupt(InterruptId::InaccessibleAddress);
+                core.regs.imsg = src;
+                return 0;
+            }
+        },
+    };
     let src = core.memory().borrow().slice(src, 8);
     let src = (src[0] as u64)
         | ((src[1] as u64) << 8)
@@ -711,7 +752,46 @@ pub fn i_ldm(inst: &[u8], core: &mut Vcore) -> u64 {
 }
 
 pub fn i_stm(inst: &[u8], core: &mut Vcore) -> u64 {
-    let mut src = core.regs.x[inst[1].lower() as usize];
+    let src = core.regs.x[inst[1].lower() as usize];
+    let mut src = match core.memory.address(
+        src,
+        core.regs.flag,
+        core.regs.kpt,
+        core.regs.upt,
+        ReadWrite::Write,
+    ) {
+        Ok(addr) => addr,
+        Err(err) => match err {
+            crate::utils::memory::AddressError::OverSized(addr) => {
+                core.intctler.interrupt(InterruptId::InaccessibleAddress);
+                core.regs.imsg = addr;
+                // 无法访问的内存的情况下，要么地址超过内存大小，要么页被交换
+                // 因此要么处理之后重新运行，要么进程直接停止
+                // 所以返回0即可
+                return 0;
+            }
+            crate::utils::memory::AddressError::WrongPrivilege => {
+                core.intctler.interrupt(InterruptId::WrongPrivilege);
+                core.regs.imsg = src;
+                // 跨特权级访问，无法恢复
+                // 程序直接停止，不能继续运行
+                return 0;
+            }
+            crate::utils::memory::AddressError::Unreadable => {
+                panic!("出现了意外情况，在写寻址时返回了不可读错误")
+            }
+            crate::utils::memory::AddressError::Unwritable => {
+                core.intctler.interrupt(InterruptId::PageOrTableUnwritable);
+                core.regs.imsg = core.regs.imsg;
+                return 0;
+            }
+            crate::utils::memory::AddressError::Ineffective => {
+                core.intctler.interrupt(InterruptId::InaccessibleAddress);
+                core.regs.imsg = src;
+                return 0;
+            }
+        },
+    };
     let src = match inst[2] {
         0 => vec![(src & 0xff) as u8],
         1 => {

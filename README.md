@@ -28,6 +28,7 @@ cargo run --bin vcore --release --features debugger -- -h
 
 * [0.2]
   * 重构vcore debugger，使debugger交互性更强，命令输入更舒适快捷。[v]
+  * 实现分页机制。
   * 实现总线输入输出指令`in`和`out`。
   * 加入对多核的完整支持，以前的版本只能在debugger中启动其它核心，新版本中可以通过机器指令访问总线打开核心。
 
@@ -42,6 +43,6 @@ cargo run --bin vcore --release --features debugger -- -h
 
 平台|状态
 :-:|:-
-Linux|0.2.0已发布
+Linux|0.2.1已发布
 Windows|正在开发
 Mac|等待适配

@@ -185,6 +185,7 @@ pub fn run(config: Config) {
     } else {
         Debugger::none(&mut cores_debug_port)
     };
+    #[warn(unused_mut)]
     let mut running = true;
     while running {
         thread::sleep(Duration::from_millis(1));
@@ -201,6 +202,7 @@ pub fn run(config: Config) {
 ///
 /// 由于debugger的存在，执行一条指令的过程并没有在这里完全体现出来。
 fn vcore(memory_size: usize, id: usize, total_core: usize, debug: bool, external_clock: bool) {
+    #[warn(unused_mut)]
     let mut core_startflg =
         SharedPointer::<bool>::bind(format!("VcoreCore{}StartFlg", id), 1).unwrap();
     // 指令计数，计算从a开始运行到现在此核心共运行了多少条指令
@@ -267,7 +269,7 @@ fn vcore(memory_size: usize, id: usize, total_core: usize, debug: bool, external
         /* 取指令 */
         let opcode = *core.memory.borrow().at(core.lazyaddr.hot_ip);
         // opcode=0x3d,0x3e分别是initext和destext指令
-        // 目前不予支持
+        // 目前不支持
         // 这两个指令依然会产生InvalidInstruction
         // TODO
         // 添加指令执行内容需在base.rs中实现，并加入到指令空间中

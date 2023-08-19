@@ -42,7 +42,7 @@ pub enum AssignError {
 
 #[derive(Debug, Clone)]
 /// ## 共享内存的指针
-/// 
+///
 /// 将linux、winows、mac三个平台上的共享内存功能封装。
 ///
 /// > 并不是智能指针
@@ -205,6 +205,7 @@ impl<T> Drop for SharedPointer<T> {
 }
 
 impl<T> SharedPointer<T> {
+    #[inline]
     pub fn slice<'a>(&self, addr: u64, mut len: u64) -> &'a [T] {
         if (addr + len) as usize > self.size {
             len = self.size as u64 - addr;
@@ -212,6 +213,7 @@ impl<T> SharedPointer<T> {
         unsafe { slice::from_raw_parts(self.pointer.add(addr as usize), len as usize) }
     }
 
+    #[inline]
     pub fn slice_mut<'a>(&self, addr: u64, mut len: u64) -> &'a mut [T] {
         if (addr + len) as usize > self.size {
             len = self.size as u64 - addr;
@@ -219,20 +221,24 @@ impl<T> SharedPointer<T> {
         unsafe { slice::from_raw_parts_mut((self.pointer as u64 + addr) as *mut T, len as usize) }
     }
 
+    #[inline]
     pub fn at<'a>(&self, addr: u64) -> &'a T {
         unsafe { &*self.pointer.add(addr as usize) }
     }
 
+    #[inline]
     pub fn at_mut<'a>(&self, addr: u64) -> &'a mut T {
         unsafe { &mut *self.pointer.add(addr as usize) }
     }
 
+    #[inline]
     pub fn write(&mut self, addr: u64, t: T) {
         if (addr as usize) < self.size {
             unsafe { *self.pointer.add(addr as usize) = t };
         }
     }
 
+    #[inline]
     pub fn write_slice(&mut self, addr: u64, s: &[T]) {
         if addr as usize + s.len() < self.size {
             unsafe {
@@ -245,10 +251,12 @@ impl<T> SharedPointer<T> {
 }
 
 impl<T> SharedPointer<T> {
+    #[inline]
     pub fn size(&self) -> usize {
         self.size
     }
 
+    #[inline]
     pub fn name(&self) -> &str {
         &self.name
     }
