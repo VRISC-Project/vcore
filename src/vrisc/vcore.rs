@@ -1,4 +1,6 @@
-use crate::utils::memory::{AddressError, Memory, ReadWrite};
+use std::{ u8, sync::mpsc::{ self, Sender }, thread };
+
+use crate::utils::memory::{ AddressError, Memory, ReadWrite };
 
 use super::base;
 
@@ -98,7 +100,7 @@ impl BitOptions for u64 {
         if reg_after == 0 {
             self.bit_set(FlagRegFlag::Zero);
         }
-        if *self & (1 << 63) != 0 {
+        if (*self & (1 << 63)) != 0 {
             self.bit_set(FlagRegFlag::Symbol);
         }
         if reg_after < reg_before {
@@ -184,6 +186,24 @@ pub enum InterruptId {
     PageOrTableUnwritable = 8,
 }
 
+impl InterruptId {
+    /// 只要不在InterruptId中，都会返回NI（Not a Interrupt）
+    pub fn generate(id: u8) -> Self {
+        match id {
+            0 => InterruptId::NI,
+            1 => InterruptId::InaccessibleAddress,
+            2 => InterruptId::Device,
+            3 => InterruptId::Clock,
+            4 => InterruptId::InvalidInstruction,
+            5 => InterruptId::WrongPrivilege,
+            6 => InterruptId::InaccessibleIOPort,
+            7 => InterruptId::PageOrTableUnreadable,
+            8 => InterruptId::PageOrTableUnwritable,
+            _ => InterruptId::NI,
+        }
+    }
+}
+
 /// 中断控制器
 ///
 /// 负责处理中断
@@ -207,11 +227,7 @@ impl InterruptController {
     }
 
     pub fn interrupted(&self) -> Option<InterruptId> {
-        if self.intflag {
-            Some(self.intid)
-        } else {
-            None
-        }
+        if self.intflag { Some(self.intid) } else { None }
     }
 
     pub fn reset_intflag(&mut self) {
@@ -306,10 +322,20 @@ pub struct Vcore {
     /// > `nop`指令详见vrisc结构文档
     pub nopflag: bool,
     pub debug_mode: DebugMode,
+
+    /// ## 终端显示管道
+    termstr_pipe: Sender<String>,
 }
 
 impl Vcore {
     pub fn new(id: usize, total_core: usize, memory: Memory) -> Self {
+        let (tx, rx) = mpsc::channel();
+        thread::spawn(move || {
+            loop {
+                let s = { rx.recv().unwrap() };
+                println!("{}", s);
+            }
+        });
         Vcore {
             id,
             total: total_core,
@@ -322,6 +348,7 @@ impl Vcore {
             transferred: true,
             nopflag: false,
             debug_mode: DebugMode::None,
+            termstr_pipe: tx,
         }
     }
 
@@ -332,7 +359,7 @@ impl Vcore {
 
     #[inline]
     pub fn execute_instruction(&mut self, opcode: u8, inst: &[u8]) {
-        let movement = self.instruction_space[opcode as usize].unwrap().0(inst, self);
+        let movement = (self.instruction_space[opcode as usize].unwrap().0)(inst, self);
         self.ip_increment += movement as i64;
         self.lazyaddr.hot_ip += movement;
         self.lazyaddr.had_run_inst = true;
@@ -350,16 +377,13 @@ impl Vcore {
             self.regs.flag.bit_reset(FlagRegFlag::InterruptEnabled);
             self.regs.flag.bit_reset(FlagRegFlag::Privilege);
 
-            let target = self
-                .memory
-                .borrow()
-                .slice(self.regs.ivt + 8 * intid as u64, 8);
+            let target = self.memory.borrow().slice(self.regs.ivt + 8 * (intid as u64), 8);
             let mut addr = 0u64;
             for i in 0..8 {
                 addr |= (target[i] as u64) << (i * 8);
             }
             self.regs.ip = addr;
-            self.intctler.intflag = false;
+            self.intctler.reset_intflag();
             self.transferred = true;
 
             self.regs.ip += self.ip_increment as u64;
@@ -420,41 +444,47 @@ impl Vcore {
                 self.lazyaddr.had_run_inst = false;
             }
         }
-        if self.transferred || self.lazyaddr.hot_ip % (16 * 1024) == 0 || self.lazyaddr.crossed_page
+        if
+            self.transferred ||
+            self.lazyaddr.hot_ip % (16 * 1024) == 0 ||
+            self.lazyaddr.crossed_page
         {
-            self.lazyaddr.hot_ip = match self.memory.address(
-                self.regs.ip,
-                self.regs.flag,
-                self.regs.kpt,
-                self.regs.upt,
-                ReadWrite::Read,
-            ) {
+            self.lazyaddr.hot_ip = match
+                self.memory.address(
+                    self.regs.ip,
+                    self.regs.flag,
+                    self.regs.kpt,
+                    self.regs.upt,
+                    ReadWrite::Read
+                )
+            {
                 Ok(address) => address,
-                Err(error) => match error {
-                    AddressError::OverSized(address) => {
-                        self.intctler.interrupt(InterruptId::InaccessibleAddress);
-                        self.regs.imsg = address;
-                        return true;
+                Err(error) =>
+                    match error {
+                        AddressError::OverSized(address) => {
+                            self.intctler.interrupt(InterruptId::InaccessibleAddress);
+                            self.regs.imsg = address;
+                            return true;
+                        }
+                        AddressError::WrongPrivilege => {
+                            self.intctler.interrupt(InterruptId::WrongPrivilege);
+                            self.regs.imsg = self.regs.ip;
+                            return true;
+                        }
+                        AddressError::Unreadable => {
+                            self.intctler.interrupt(InterruptId::PageOrTableUnreadable);
+                            self.regs.imsg = self.regs.imsg;
+                            return true;
+                        }
+                        AddressError::Unwritable => {
+                            panic!("出现了意外情况，在读寻址时返回了不可写错误")
+                        }
+                        AddressError::Ineffective => {
+                            self.intctler.interrupt(InterruptId::InaccessibleAddress);
+                            self.regs.imsg = self.regs.ip;
+                            return true;
+                        }
                     }
-                    AddressError::WrongPrivilege => {
-                        self.intctler.interrupt(InterruptId::WrongPrivilege);
-                        self.regs.imsg = self.regs.ip;
-                        return true;
-                    }
-                    AddressError::Unreadable => {
-                        self.intctler.interrupt(InterruptId::PageOrTableUnreadable);
-                        self.regs.imsg = self.regs.imsg;
-                        return true;
-                    }
-                    AddressError::Unwritable => {
-                        panic!("出现了意外情况，在读寻址时返回了不可写错误")
-                    }
-                    AddressError::Ineffective => {
-                        self.intctler.interrupt(InterruptId::InaccessibleAddress);
-                        self.regs.imsg = self.regs.ip;
-                        return true;
-                    }
-                },
             };
             self.transferred = false;
             self.lazyaddr.crossed_page = false;
@@ -479,59 +509,61 @@ impl Vcore {
         self.ip_increment = 0;
         let inst_st = self.lazyaddr.hot_ip; //最后14位为0
         let inst_end = self.lazyaddr.hot_ip + instlen;
-        if inst_st & 0xffff_ffff_ffff_c000 == inst_end & 0xffff_ffff_ffff_c000
-            || inst_end == inst_end & 0xffff_ffff_ffff_c000
+        if
+            (inst_st & 0xffff_ffff_ffff_c000) == (inst_end & 0xffff_ffff_ffff_c000) ||
+            inst_end == (inst_end & 0xffff_ffff_ffff_c000)
         {
             //指令未跨页
-            (
-                self.memory()
-                    .borrow()
-                    .slice(self.lazyaddr.hot_ip, instlen)
-                    .to_vec(),
-                false,
-            )
+            (self.memory().borrow().slice(self.lazyaddr.hot_ip, instlen).to_vec(), false)
         } else {
             //指令跨页
-            let firstl = inst_end & 0xffff_ffff_ffff_c000 - inst_st;
-            let lastl = inst_end - inst_end & 0xffff_ffff_ffff_c000;
+            let firstl = inst_end & (0xffff_ffff_ffff_c000 - inst_st);
+            let lastl = (inst_end - inst_end) & 0xffff_ffff_ffff_c000;
             inst.copy_from_slice(self.memory().borrow().slice(inst_st, firstl));
-            let last_st = match self.memory.address(
-                self.regs.ip + firstl,
-                self.regs.flag,
-                self.regs.kpt,
-                self.regs.upt,
-                ReadWrite::Read,
-            ) {
+            let last_st = match
+                self.memory.address(
+                    self.regs.ip + firstl,
+                    self.regs.flag,
+                    self.regs.kpt,
+                    self.regs.upt,
+                    ReadWrite::Read
+                )
+            {
                 Ok(address) => address,
-                Err(error) => match error {
-                    AddressError::OverSized(address) => {
-                        self.intctler.interrupt(InterruptId::InaccessibleAddress);
-                        self.regs.imsg = address;
-                        return (Vec::new(), true);
+                Err(error) =>
+                    match error {
+                        AddressError::OverSized(address) => {
+                            self.intctler.interrupt(InterruptId::InaccessibleAddress);
+                            self.regs.imsg = address;
+                            return (Vec::new(), true);
+                        }
+                        AddressError::WrongPrivilege => {
+                            self.intctler.interrupt(InterruptId::WrongPrivilege);
+                            self.regs.imsg = self.regs.ip;
+                            return (Vec::new(), true);
+                        }
+                        AddressError::Unreadable => {
+                            self.intctler.interrupt(InterruptId::PageOrTableUnreadable);
+                            self.regs.imsg = self.regs.imsg;
+                            return (Vec::new(), true);
+                        }
+                        AddressError::Unwritable => {
+                            panic!("出现了意外情况，在读寻址时返回了不可写错误")
+                        }
+                        AddressError::Ineffective => {
+                            self.intctler.interrupt(InterruptId::InaccessibleAddress);
+                            self.regs.imsg = self.regs.ip + firstl;
+                            return (Vec::new(), true);
+                        }
                     }
-                    AddressError::WrongPrivilege => {
-                        self.intctler.interrupt(InterruptId::WrongPrivilege);
-                        self.regs.imsg = self.regs.ip;
-                        return (Vec::new(), true);
-                    }
-                    AddressError::Unreadable => {
-                        self.intctler.interrupt(InterruptId::PageOrTableUnreadable);
-                        self.regs.imsg = self.regs.imsg;
-                        return (Vec::new(), true);
-                    }
-                    AddressError::Unwritable => {
-                        panic!("出现了意外情况，在读寻址时返回了不可写错误")
-                    }
-                    AddressError::Ineffective => {
-                        self.intctler.interrupt(InterruptId::InaccessibleAddress);
-                        self.regs.imsg = self.regs.ip + firstl;
-                        return (Vec::new(), true);
-                    }
-                },
             };
             inst.append(&mut self.memory().borrow().slice_mut(last_st, lastl).to_vec());
             self.lazyaddr.crossed_page = true;
             (inst, false)
         }
+    }
+
+    pub fn deliver_string(&mut self, text: String) {
+        self.termstr_pipe.send(text).unwrap();
     }
 }

@@ -8,21 +8,21 @@ use core::panic;
 use debugger::debug::DebuggerBackend;
 #[cfg(target_os = "linux")]
 use nix::unistd;
-use std::{fs::File, io::Read, process::exit, thread, time::Duration};
+use std::{ fs::File, io::Read, process::exit, thread, time::Duration };
 #[cfg(target_os = "windows")]
-use std::{mem::size_of, ptr::null_mut};
+use std::{ mem::size_of, ptr::null_mut };
 #[cfg(target_os = "windows")]
 use winapi::um::{
     errhandlingapi::GetLastError,
     processthreadsapi::STARTUPINFOW,
-    processthreadsapi::{CreateProcessW, PROCESS_INFORMATION},
+    processthreadsapi::{ CreateProcessW, PROCESS_INFORMATION },
 };
 
 use config::Config;
 #[cfg(feature = "debugger")]
-use debugger::debug::{Debugger, VdbApi};
-use utils::{clock::Clock, memory::Memory, shared::SharedPointer};
-use vrisc::vcore::{InterruptId, Vcore};
+use debugger::debug::{ Debugger, VdbApi };
+use utils::{ clock::Clock, memory::Memory, shared::SharedPointer };
+use vrisc::vcore::{ InterruptId, Vcore };
 
 /// # vcore从这里开始运行
 ///
@@ -43,13 +43,7 @@ use vrisc::vcore::{InterruptId, Vcore};
 pub fn run(config: Config) {
     #[cfg(target_os = "windows")]
     if config.process_child {
-        vcore(
-            config.memory,
-            config.id_core,
-            config.cores,
-            config.debug,
-            config.external_clock,
-        );
+        vcore(config.memory, config.id_core, config.cores, config.debug, config.external_clock);
         exit(0);
     }
     let mut cores = Vec::new();
@@ -74,13 +68,16 @@ pub fn run(config: Config) {
     }
 
     for i in 0..config.cores {
-        cores_startflg
-            .push(SharedPointer::<bool>::new(format!("VcoreCore{}StartFlg", i), 1).unwrap());
-        cores_inst_count
-            .push(SharedPointer::<u64>::new(format!("VcoreCore{}InstCount", i), 1).unwrap());
+        cores_startflg.push(
+            SharedPointer::<bool>::new(format!("VcoreCore{}StartFlg", i), 1).unwrap()
+        );
+        cores_inst_count.push(
+            SharedPointer::<u64>::new(format!("VcoreCore{}InstCount", i), 1).unwrap()
+        );
         #[cfg(feature = "debugger")]
-        cores_debug_port
-            .push(SharedPointer::<VdbApi>::new(format!("VcoreCore{}DebugApi", i), 1).unwrap());
+        cores_debug_port.push(
+            SharedPointer::<VdbApi>::new(format!("VcoreCore{}DebugApi", i), 1).unwrap()
+        );
         #[cfg(feature = "debugger")]
         cores_debug_port[i].write(0, VdbApi::None);
 
@@ -91,16 +88,10 @@ pub fn run(config: Config) {
             cores_startflg[i].write(0, false);
         }
         #[cfg(target_os = "linux")]
-        match unsafe { unistd::fork().unwrap() } {
+        match (unsafe { unistd::fork().unwrap() }) {
             unistd::ForkResult::Parent { child } => cores.push(child),
             unistd::ForkResult::Child => {
-                vcore(
-                    config.memory,
-                    i,
-                    config.cores,
-                    config.debug,
-                    config.external_clock,
-                );
+                vcore(config.memory, i, config.cores, config.debug, config.external_clock);
                 exit(0);
             }
         }
@@ -150,33 +141,35 @@ pub fn run(config: Config) {
                 cmd.as_mut_ptr()
             };
             println!("{}", cmd);
-            if !unsafe {
-                if CreateProcessW(
-                    null_mut(),
-                    cmdp,
-                    null_mut(),
-                    null_mut(),
-                    false as i32,
-                    0,
-                    null_mut(),
-                    null_mut(),
-                    &mut si,
-                    &mut pi,
-                ) != 0
-                {
-                    true
-                } else {
-                    false
-                }
-            } {
-                panic!("Failed to create new process. {}", unsafe {
-                    GetLastError()
-                });
+            if
+                !(unsafe {
+                    if
+                        CreateProcessW(
+                            null_mut(),
+                            cmdp,
+                            null_mut(),
+                            null_mut(),
+                            false as i32,
+                            0,
+                            null_mut(),
+                            null_mut(),
+                            &mut si,
+                            &mut pi
+                        ) != 0
+                    {
+                        true
+                    } else {
+                        false
+                    }
+                })
+            {
+                panic!("Failed to create new process. {}", unsafe { GetLastError() });
             }
             cores.push(pi.hProcess);
         }
         #[cfg(target_os = "macos")]
-        {}
+        {
+        }
     }
 
     #[cfg(feature = "debugger")]
@@ -185,7 +178,6 @@ pub fn run(config: Config) {
     } else {
         Debugger::none(&mut cores_debug_port)
     };
-    #[warn(unused_mut)]
     let mut running = true;
     while running {
         thread::sleep(Duration::from_millis(1));
@@ -202,13 +194,14 @@ pub fn run(config: Config) {
 ///
 /// 由于debugger的存在，执行一条指令的过程并没有在这里完全体现出来。
 fn vcore(memory_size: usize, id: usize, total_core: usize, debug: bool, external_clock: bool) {
-    #[warn(unused_mut)]
-    let mut core_startflg =
-        SharedPointer::<bool>::bind(format!("VcoreCore{}StartFlg", id), 1).unwrap();
+    let mut core_startflg = SharedPointer::<bool>
+        ::bind(format!("VcoreCore{}StartFlg", id), 1)
+        .unwrap();
     // 指令计数，计算从a开始运行到现在此核心共运行了多少条指令
     // 用于vcore父进程统计执行速度等
-    let mut core_instruction_count =
-        SharedPointer::<u64>::bind(format!("VcoreCore{}InstCount", id), 1).unwrap();
+    let mut core_instruction_count = SharedPointer::<u64>
+        ::bind(format!("VcoreCore{}InstCount", id), 1)
+        .unwrap();
     core_instruction_count.write(0, 0);
     // vcore核心
     let mut core = Vcore::new(id, total_core, Memory::bind(memory_size));
@@ -224,8 +217,12 @@ fn vcore(memory_size: usize, id: usize, total_core: usize, debug: bool, external
         #[cfg(feature = "debugger")]
         if debug {
             match debugger_backend.before_start(&mut core_startflg, &mut core.debug_mode) {
-                Some(true) => continue,
-                None => break,
+                Some(true) => {
+                    continue;
+                }
+                None => {
+                    break;
+                }
                 _ => (),
             };
         }
@@ -250,14 +247,21 @@ fn vcore(memory_size: usize, id: usize, total_core: usize, debug: bool, external
         // debugger后端
         #[cfg(feature = "debugger")]
         if debug {
-            match debugger_backend.after_start(
-                core.lazyaddr.hot_ip,
-                &mut core.regs,
-                &mut core.debug_mode,
-                &mut core.memory,
-            ) {
-                Some(true) => continue,
-                None => break,
+            match
+                debugger_backend.after_start(
+                    core.lazyaddr.hot_ip,
+                    &mut core.regs,
+                    &mut core.intctler,
+                    &mut core.debug_mode,
+                    &mut core.memory
+                )
+            {
+                Some(true) => {
+                    continue;
+                }
+                None => {
+                    break;
+                }
                 _ => (),
             };
         }

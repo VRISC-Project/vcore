@@ -1,6 +1,6 @@
 use crate::utils::memory::ReadWrite;
 
-use super::vcore::{BitOptions, ConditionCode, FlagRegFlag, InterruptId, Vcore, VcoreInstruction};
+use super::vcore::{ BitOptions, ConditionCode, FlagRegFlag, InterruptId, Vcore, VcoreInstruction };
 
 /// ## 基本指令集
 pub const BASE: [Option<VcoreInstruction>; 64] = [
@@ -91,7 +91,6 @@ impl Oprand for u8 {
 /// 会自行修改ip寄存器，实际返回的值可能与指令长度不符，所以需要
 /// 指令返回ip寄存器需要增加的长度
 // TODO
-
 pub fn i_nop(_inst: &[u8], core: &mut Vcore) -> u64 {
     core.nopflag = true;
     1
@@ -100,19 +99,18 @@ pub fn i_nop(_inst: &[u8], core: &mut Vcore) -> u64 {
 pub fn i_add(inst: &[u8], core: &mut Vcore) -> u64 {
     match inst[2].higher() {
         0 => {
-            core.regs.x[inst[2].lower() as usize] = (core.regs.x[inst[1].lower() as usize] as u8
-                + core.regs.x[inst[1].higher() as usize] as u8)
-                as u64;
+            core.regs.x[inst[2].lower() as usize] = ((core.regs.x[inst[1].lower() as usize] as u8) +
+                (core.regs.x[inst[1].higher() as usize] as u8)) as u64;
         }
         1 => {
-            core.regs.x[inst[2].lower() as usize] = (core.regs.x[inst[1].lower() as usize] as u16
-                + core.regs.x[inst[1].higher() as usize] as u16)
-                as u64;
+            core.regs.x[inst[2].lower() as usize] = ((
+                core.regs.x[inst[1].lower() as usize] as u16
+            ) + (core.regs.x[inst[1].higher() as usize] as u16)) as u64;
         }
         2 => {
-            core.regs.x[inst[2].lower() as usize] = (core.regs.x[inst[1].lower() as usize] as u32
-                + core.regs.x[inst[1].higher() as usize] as u32)
-                as u64;
+            core.regs.x[inst[2].lower() as usize] = ((
+                core.regs.x[inst[1].lower() as usize] as u32
+            ) + (core.regs.x[inst[1].higher() as usize] as u32)) as u64;
         }
         3 => {
             core.regs.x[inst[2].lower() as usize] =
@@ -122,7 +120,7 @@ pub fn i_add(inst: &[u8], core: &mut Vcore) -> u64 {
     }
     core.regs.flag.mark_symbol(
         core.regs.x[inst[1].lower() as usize].max(core.regs.x[inst[1].higher() as usize]),
-        core.regs.x[inst[2].lower() as usize],
+        core.regs.x[inst[2].lower() as usize]
     );
     3
 }
@@ -130,19 +128,18 @@ pub fn i_add(inst: &[u8], core: &mut Vcore) -> u64 {
 pub fn i_sub(inst: &[u8], core: &mut Vcore) -> u64 {
     match inst[2].higher() {
         0 => {
-            core.regs.x[inst[2].lower() as usize] = (core.regs.x[inst[1].lower() as usize] as u8
-                - core.regs.x[inst[1].higher() as usize] as u8)
-                as u64;
+            core.regs.x[inst[2].lower() as usize] = ((core.regs.x[inst[1].lower() as usize] as u8) -
+                (core.regs.x[inst[1].higher() as usize] as u8)) as u64;
         }
         1 => {
-            core.regs.x[inst[2].lower() as usize] = (core.regs.x[inst[1].lower() as usize] as u16
-                - core.regs.x[inst[1].higher() as usize] as u16)
-                as u64;
+            core.regs.x[inst[2].lower() as usize] = ((
+                core.regs.x[inst[1].lower() as usize] as u16
+            ) - (core.regs.x[inst[1].higher() as usize] as u16)) as u64;
         }
         2 => {
-            core.regs.x[inst[2].lower() as usize] = (core.regs.x[inst[1].lower() as usize] as u32
-                - core.regs.x[inst[1].higher() as usize] as u32)
-                as u64;
+            core.regs.x[inst[2].lower() as usize] = ((
+                core.regs.x[inst[1].lower() as usize] as u32
+            ) - (core.regs.x[inst[1].higher() as usize] as u32)) as u64;
         }
         3 => {
             core.regs.x[inst[2].lower() as usize] =
@@ -152,7 +149,7 @@ pub fn i_sub(inst: &[u8], core: &mut Vcore) -> u64 {
     }
     core.regs.flag.mark_symbol(
         core.regs.x[inst[1].lower() as usize].max(core.regs.x[inst[1].higher() as usize]),
-        core.regs.x[inst[2].lower() as usize],
+        core.regs.x[inst[2].lower() as usize]
     );
     if core.regs.flag.bit_get(FlagRegFlag::Overflow) {
         core.regs.flag.bit_reset(FlagRegFlag::Overflow);
@@ -188,9 +185,7 @@ pub fn i_inc(inst: &[u8], core: &mut Vcore) -> u64 {
         }
         _ => (),
     }
-    core.regs
-        .flag
-        .mark_symbol(reg_before, core.regs.x[inst[1].lower() as usize]);
+    core.regs.flag.mark_symbol(reg_before, core.regs.x[inst[1].lower() as usize]);
     2
 }
 
@@ -220,9 +215,7 @@ pub fn i_dec(inst: &[u8], core: &mut Vcore) -> u64 {
         }
         _ => (),
     }
-    core.regs
-        .flag
-        .mark_symbol(reg_before, core.regs.x[inst[1].lower() as usize]);
+    core.regs.flag.mark_symbol(reg_before, core.regs.x[inst[1].lower() as usize]);
     if core.regs.flag.bit_get(FlagRegFlag::Overflow) {
         core.regs.flag.bit_reset(FlagRegFlag::Overflow);
     } else {
@@ -258,9 +251,7 @@ pub fn i_shl(inst: &[u8], core: &mut Vcore) -> u64 {
         }
         _ => (),
     }
-    core.regs
-        .flag
-        .mark_symbol(reg_before, core.regs.x[inst[1].higher() as usize]);
+    core.regs.flag.mark_symbol(reg_before, core.regs.x[inst[1].higher() as usize]);
     3
 }
 
@@ -291,9 +282,7 @@ pub fn i_shr(inst: &[u8], core: &mut Vcore) -> u64 {
         }
         _ => (),
     }
-    core.regs
-        .flag
-        .mark_symbol(reg_before, core.regs.x[inst[1].higher() as usize]);
+    core.regs.flag.mark_symbol(reg_before, core.regs.x[inst[1].higher() as usize]);
     3
 }
 
@@ -330,9 +319,7 @@ pub fn i_rol(inst: &[u8], core: &mut Vcore) -> u64 {
         }
         _ => (),
     }
-    core.regs
-        .flag
-        .mark_symbol(reg_before, core.regs.x[inst[1].higher() as usize]);
+    core.regs.flag.mark_symbol(reg_before, core.regs.x[inst[1].higher() as usize]);
     core.regs.flag.bit_reset(FlagRegFlag::Overflow);
     3
 }
@@ -370,9 +357,7 @@ pub fn i_ror(inst: &[u8], core: &mut Vcore) -> u64 {
         }
         _ => (),
     }
-    core.regs
-        .flag
-        .mark_symbol(reg_before, core.regs.x[inst[1].higher() as usize]);
+    core.regs.flag.mark_symbol(reg_before, core.regs.x[inst[1].higher() as usize]);
     core.regs.flag.bit_reset(FlagRegFlag::Overflow);
     3
 }
@@ -398,7 +383,7 @@ pub fn i_cmp(inst: &[u8], core: &mut Vcore) -> u64 {
             core.regs.flag.bit_reset(FlagRegFlag::Higher);
         }
         //有符号大于小于
-        if core.regs.x[r1] as i64 > core.regs.x[r2] as i64 {
+        if (core.regs.x[r1] as i64) > (core.regs.x[r2] as i64) {
             core.regs.flag.bit_set(FlagRegFlag::Higher);
             core.regs.flag.bit_reset(FlagRegFlag::Lower);
         } else {
@@ -416,13 +401,13 @@ pub fn i_and(inst: &[u8], core: &mut Vcore) -> u64 {
     let reg_before = core.regs.x[r1].max(core.regs.x[r2]);
     match inst[2].higher() {
         0 => {
-            core.regs.x[r3] = (core.regs.x[r1] as u8 & core.regs.x[r2] as u8) as u64;
+            core.regs.x[r3] = ((core.regs.x[r1] as u8) & (core.regs.x[r2] as u8)) as u64;
         }
         1 => {
-            core.regs.x[r3] = (core.regs.x[r1] as u16 & core.regs.x[r2] as u16) as u64;
+            core.regs.x[r3] = ((core.regs.x[r1] as u16) & (core.regs.x[r2] as u16)) as u64;
         }
         2 => {
-            core.regs.x[r3] = (core.regs.x[r1] as u32 & core.regs.x[r2] as u32) as u64;
+            core.regs.x[r3] = ((core.regs.x[r1] as u32) & (core.regs.x[r2] as u32)) as u64;
         }
         3 => {
             core.regs.x[r3] = core.regs.x[r1] & core.regs.x[r2];
@@ -441,13 +426,13 @@ pub fn i_or(inst: &[u8], core: &mut Vcore) -> u64 {
     let reg_before = core.regs.x[r1].max(core.regs.x[r2]);
     match inst[2].higher() {
         0 => {
-            core.regs.x[r3] = (core.regs.x[r1] as u8 | core.regs.x[r2] as u8) as u64;
+            core.regs.x[r3] = ((core.regs.x[r1] as u8) | (core.regs.x[r2] as u8)) as u64;
         }
         1 => {
-            core.regs.x[r3] = (core.regs.x[r1] as u16 | core.regs.x[r2] as u16) as u64;
+            core.regs.x[r3] = ((core.regs.x[r1] as u16) | (core.regs.x[r2] as u16)) as u64;
         }
         2 => {
-            core.regs.x[r3] = (core.regs.x[r1] as u32 | core.regs.x[r2] as u32) as u64;
+            core.regs.x[r3] = ((core.regs.x[r1] as u32) | (core.regs.x[r2] as u32)) as u64;
         }
         3 => {
             core.regs.x[r3] = core.regs.x[r1] | core.regs.x[r2];
@@ -464,13 +449,13 @@ pub fn i_not(inst: &[u8], core: &mut Vcore) -> u64 {
     let r2 = inst[1].higher() as usize;
     match inst[2].lower() {
         0 => {
-            core.regs.x[r2] = (!(core.regs.x[r1] as u8)) as u64;
+            core.regs.x[r2] = !(core.regs.x[r1] as u8) as u64;
         }
         1 => {
-            core.regs.x[r2] = (!(core.regs.x[r1] as u16)) as u64;
+            core.regs.x[r2] = !(core.regs.x[r1] as u16) as u64;
         }
         2 => {
-            core.regs.x[r2] = (!(core.regs.x[r1] as u32)) as u64;
+            core.regs.x[r2] = !(core.regs.x[r1] as u32) as u64;
         }
         3 => {
             core.regs.x[r2] = !core.regs.x[r2];
@@ -489,13 +474,13 @@ pub fn i_xor(inst: &[u8], core: &mut Vcore) -> u64 {
     let reg_before = core.regs.x[r1].max(core.regs.x[r2]);
     match inst[2].higher() {
         0 => {
-            core.regs.x[r3] = (core.regs.x[r1] as u8 ^ core.regs.x[r2] as u8) as u64;
+            core.regs.x[r3] = ((core.regs.x[r1] as u8) ^ (core.regs.x[r2] as u8)) as u64;
         }
         1 => {
-            core.regs.x[r3] = (core.regs.x[r1] as u16 ^ core.regs.x[r2] as u16) as u64;
+            core.regs.x[r3] = ((core.regs.x[r1] as u16) ^ (core.regs.x[r2] as u16)) as u64;
         }
         2 => {
-            core.regs.x[r3] = (core.regs.x[r1] as u32 ^ core.regs.x[r2] as u32) as u64;
+            core.regs.x[r3] = ((core.regs.x[r1] as u32) ^ (core.regs.x[r2] as u32)) as u64;
         }
         3 => {
             core.regs.x[r3] = core.regs.x[r1] ^ core.regs.x[r2];
@@ -508,31 +493,27 @@ pub fn i_xor(inst: &[u8], core: &mut Vcore) -> u64 {
 }
 
 pub fn i_jc(inst: &[u8], core: &mut Vcore) -> u64 {
-    if core
-        .regs
-        .flag
-        .satisfies_condition(ConditionCode::new(inst[1].higher()))
-    {
+    if core.regs.flag.satisfies_condition(ConditionCode::new(inst[1].higher())) {
         match inst[1].lower() {
             0 => {
-                core.regs.ip = (inst[2] as u16 | ((inst[3] as u16) << 8)) as u64;
+                core.regs.ip = ((inst[2] as u16) | ((inst[3] as u16) << 8)) as u64;
             }
             1 => {
-                core.regs.ip = (inst[2] as u32
-                    | ((inst[3] as u32) << 8)
-                    | ((inst[4] as u32) << 16)
-                    | ((inst[5] as u32) << 24)) as u64;
+                core.regs.ip = ((inst[2] as u32) |
+                    ((inst[3] as u32) << 8) |
+                    ((inst[4] as u32) << 16) |
+                    ((inst[5] as u32) << 24)) as u64;
             }
             2 => {
-                core.regs.ip = (inst[2] as u64
-                    | ((inst[3] as u64) << 8)
-                    | ((inst[4] as u64) << 16)
-                    | ((inst[5] as u64) << 24)
-                    | ((inst[6] as u64) << 32)
-                    | ((inst[7] as u64) << 40)
-                    | ((inst[8] as u64) << 48)
-                    | ((inst[9] as u64) << 56)) as u64;
-                println!("{:x}", core.regs.ip)
+                core.regs.ip = ((inst[2] as u64) |
+                    ((inst[3] as u64) << 8) |
+                    ((inst[4] as u64) << 16) |
+                    ((inst[5] as u64) << 24) |
+                    ((inst[6] as u64) << 32) |
+                    ((inst[7] as u64) << 40) |
+                    ((inst[8] as u64) << 48) |
+                    ((inst[9] as u64) << 56)) as u64;
+                println!("{:x}", core.regs.ip);
             }
             _ => (),
         }
@@ -542,31 +523,27 @@ pub fn i_jc(inst: &[u8], core: &mut Vcore) -> u64 {
 }
 
 pub fn i_cc(inst: &[u8], core: &mut Vcore) -> u64 {
-    if core
-        .regs
-        .flag
-        .satisfies_condition(ConditionCode::new(inst[1].higher()))
-    {
+    if core.regs.flag.satisfies_condition(ConditionCode::new(inst[1].higher())) {
         core.regs.ipdump = core.regs.ip;
         match inst[1].lower() {
             0 => {
-                core.regs.ip = (inst[2] as u16 | ((inst[3] as u16) << 8)) as u64;
+                core.regs.ip = ((inst[2] as u16) | ((inst[3] as u16) << 8)) as u64;
             }
             1 => {
-                core.regs.ip = (inst[2] as u32
-                    | ((inst[3] as u32) << 8)
-                    | ((inst[4] as u32) << 16)
-                    | ((inst[5] as u32) << 24)) as u64;
+                core.regs.ip = ((inst[2] as u32) |
+                    ((inst[3] as u32) << 8) |
+                    ((inst[4] as u32) << 16) |
+                    ((inst[5] as u32) << 24)) as u64;
             }
             2 => {
-                core.regs.ip = (inst[2] as u64
-                    | ((inst[3] as u64) << 8)
-                    | ((inst[4] as u64) << 16)
-                    | ((inst[5] as u64) << 24)
-                    | ((inst[6] as u64) << 32)
-                    | ((inst[7] as u64) << 40)
-                    | ((inst[8] as u64) << 48)
-                    | ((inst[9] as u64) << 56)) as u64;
+                core.regs.ip = ((inst[2] as u64) |
+                    ((inst[3] as u64) << 8) |
+                    ((inst[4] as u64) << 16) |
+                    ((inst[5] as u64) << 24) |
+                    ((inst[6] as u64) << 32) |
+                    ((inst[7] as u64) << 40) |
+                    ((inst[8] as u64) << 48) |
+                    ((inst[9] as u64) << 56)) as u64;
             }
             _ => (),
         }
@@ -583,15 +560,16 @@ pub fn i_r(_inst: &[u8], core: &mut Vcore) -> u64 {
 
 pub fn i_loop(inst: &[u8], core: &mut Vcore) -> u64 {
     if core.regs.x[inst[1] as usize] != 0 {
-        let target = (inst[2] as u32)
-            | ((inst[3] as u32) << 8)
-            | ((inst[4] as u32) << 16)
-            | ((inst[5] as u32) << 24);
-        let target = if target & (1 << 31) != 0 {
+        let target =
+            (inst[2] as u32) |
+            ((inst[3] as u32) << 8) |
+            ((inst[4] as u32) << 16) |
+            ((inst[5] as u32) << 24);
+        let target = (if (target & (1 << 31)) != 0 {
             -(target as i32)
         } else {
             target as i32
-        } as i64 as u64;
+        }) as i64 as u64;
         core.regs.ip = target;
         core.transferred = true;
         0
@@ -647,28 +625,28 @@ pub fn i_ldi(inst: &[u8], core: &mut Vcore) -> u64 {
             core.regs.x[inst[1].higher() as usize] = imm as u64;
         }
         2 => {
-            let imm = (inst[2] as u32)
-                | ((inst[3] as u32) << 8)
-                | ((inst[4] as u32) << 16)
-                | ((inst[5] as u32) << 24);
+            let imm =
+                (inst[2] as u32) |
+                ((inst[3] as u32) << 8) |
+                ((inst[4] as u32) << 16) |
+                ((inst[5] as u32) << 24);
             core.regs.x[inst[1].higher() as usize] = imm as u64;
         }
         3 => {
-            let imm = (inst[2] as u64)
-                | ((inst[3] as u64) << 8)
-                | ((inst[4] as u64) << 16)
-                | ((inst[5] as u64) << 24)
-                | ((inst[6] as u64) << 32)
-                | ((inst[7] as u64) << 40)
-                | ((inst[8] as u64) << 48)
-                | ((inst[9] as u64) << 56);
+            let imm =
+                (inst[2] as u64) |
+                ((inst[3] as u64) << 8) |
+                ((inst[4] as u64) << 16) |
+                ((inst[5] as u64) << 24) |
+                ((inst[6] as u64) << 32) |
+                ((inst[7] as u64) << 40) |
+                ((inst[8] as u64) << 48) |
+                ((inst[9] as u64) << 56);
             core.regs.x[inst[1].higher() as usize] = imm as u64;
         }
         _ => (),
     }
-    core.regs
-        .flag
-        .mark_symbol(reg_before, core.regs.x[inst[1].higher() as usize]);
+    core.regs.flag.mark_symbol(reg_before, core.regs.x[inst[1].higher() as usize]);
     core.regs.flag.bit_reset(FlagRegFlag::Overflow);
     match inst[1].lower() {
         0 => 3,
@@ -681,54 +659,52 @@ pub fn i_ldi(inst: &[u8], core: &mut Vcore) -> u64 {
 
 pub fn i_ldm(inst: &[u8], core: &mut Vcore) -> u64 {
     let src = core.regs.x[inst[1].lower() as usize];
-    let src = match core.memory.address(
-        src,
-        core.regs.flag,
-        core.regs.kpt,
-        core.regs.upt,
-        ReadWrite::Read,
-    ) {
+    let src = match
+        core.memory.address(src, core.regs.flag, core.regs.kpt, core.regs.upt, ReadWrite::Read)
+    {
         Ok(addr) => addr,
-        Err(err) => match err {
-            crate::utils::memory::AddressError::OverSized(addr) => {
-                core.intctler.interrupt(InterruptId::InaccessibleAddress);
-                core.regs.imsg = addr;
-                // 无法访问的内存的情况下，要么地址超过内存大小，要么页被交换
-                // 因此要么处理之后重新运行，要么进程直接停止
-                // 所以返回0即可
-                return 0;
+        Err(err) =>
+            match err {
+                crate::utils::memory::AddressError::OverSized(addr) => {
+                    core.intctler.interrupt(InterruptId::InaccessibleAddress);
+                    core.regs.imsg = addr;
+                    // 无法访问的内存的情况下，要么地址超过内存大小，要么页被交换
+                    // 因此要么处理之后重新运行，要么进程直接停止
+                    // 所以返回0即可
+                    return 0;
+                }
+                crate::utils::memory::AddressError::WrongPrivilege => {
+                    core.intctler.interrupt(InterruptId::WrongPrivilege);
+                    core.regs.imsg = src;
+                    // 跨特权级访问，无法恢复
+                    // 程序直接停止，不能继续运行
+                    return 0;
+                }
+                crate::utils::memory::AddressError::Unreadable => {
+                    core.intctler.interrupt(InterruptId::PageOrTableUnreadable);
+                    core.regs.imsg = core.regs.imsg;
+                    return 0;
+                }
+                crate::utils::memory::AddressError::Unwritable => {
+                    panic!("出现了意外情况，在读寻址时返回了不可写错误")
+                }
+                crate::utils::memory::AddressError::Ineffective => {
+                    core.intctler.interrupt(InterruptId::InaccessibleAddress);
+                    core.regs.imsg = src;
+                    return 0;
+                }
             }
-            crate::utils::memory::AddressError::WrongPrivilege => {
-                core.intctler.interrupt(InterruptId::WrongPrivilege);
-                core.regs.imsg = src;
-                // 跨特权级访问，无法恢复
-                // 程序直接停止，不能继续运行
-                return 0;
-            }
-            crate::utils::memory::AddressError::Unreadable => {
-                core.intctler.interrupt(InterruptId::PageOrTableUnreadable);
-                core.regs.imsg = core.regs.imsg;
-                return 0;
-            }
-            crate::utils::memory::AddressError::Unwritable => {
-                panic!("出现了意外情况，在读寻址时返回了不可写错误")
-            }
-            crate::utils::memory::AddressError::Ineffective => {
-                core.intctler.interrupt(InterruptId::InaccessibleAddress);
-                core.regs.imsg = src;
-                return 0;
-            }
-        },
     };
     let src = core.memory().borrow().slice(src, 8);
-    let src = (src[0] as u64)
-        | ((src[1] as u64) << 8)
-        | ((src[2] as u64) << 16)
-        | ((src[3] as u64) << 24)
-        | ((src[4] as u64) << 32)
-        | ((src[5] as u64) << 40)
-        | ((src[6] as u64) << 48)
-        | ((src[7] as u64) << 56);
+    let src =
+        (src[0] as u64) |
+        ((src[1] as u64) << 8) |
+        ((src[2] as u64) << 16) |
+        ((src[3] as u64) << 24) |
+        ((src[4] as u64) << 32) |
+        ((src[5] as u64) << 40) |
+        ((src[6] as u64) << 48) |
+        ((src[7] as u64) << 56);
     match inst[2] {
         0 => {
             let src = src as u8;
@@ -746,51 +722,48 @@ pub fn i_ldm(inst: &[u8], core: &mut Vcore) -> u64 {
             core.regs.x[inst[1].higher() as usize] = src;
         }
         _ => (),
-    };
+    }
     core.regs.flag.mark_symbol(src, src);
     3
 }
 
 pub fn i_stm(inst: &[u8], core: &mut Vcore) -> u64 {
     let src = core.regs.x[inst[1].lower() as usize];
-    let mut src = match core.memory.address(
-        src,
-        core.regs.flag,
-        core.regs.kpt,
-        core.regs.upt,
-        ReadWrite::Write,
-    ) {
+    let mut src = match
+        core.memory.address(src, core.regs.flag, core.regs.kpt, core.regs.upt, ReadWrite::Write)
+    {
         Ok(addr) => addr,
-        Err(err) => match err {
-            crate::utils::memory::AddressError::OverSized(addr) => {
-                core.intctler.interrupt(InterruptId::InaccessibleAddress);
-                core.regs.imsg = addr;
-                // 无法访问的内存的情况下，要么地址超过内存大小，要么页被交换
-                // 因此要么处理之后重新运行，要么进程直接停止
-                // 所以返回0即可
-                return 0;
+        Err(err) =>
+            match err {
+                crate::utils::memory::AddressError::OverSized(addr) => {
+                    core.intctler.interrupt(InterruptId::InaccessibleAddress);
+                    core.regs.imsg = addr;
+                    // 无法访问的内存的情况下，要么地址超过内存大小，要么页被交换
+                    // 因此要么处理之后重新运行，要么进程直接停止
+                    // 所以返回0即可
+                    return 0;
+                }
+                crate::utils::memory::AddressError::WrongPrivilege => {
+                    core.intctler.interrupt(InterruptId::WrongPrivilege);
+                    core.regs.imsg = src;
+                    // 跨特权级访问，无法恢复
+                    // 程序直接停止，不能继续运行
+                    return 0;
+                }
+                crate::utils::memory::AddressError::Unreadable => {
+                    panic!("出现了意外情况，在写寻址时返回了不可读错误")
+                }
+                crate::utils::memory::AddressError::Unwritable => {
+                    core.intctler.interrupt(InterruptId::PageOrTableUnwritable);
+                    core.regs.imsg = core.regs.imsg;
+                    return 0;
+                }
+                crate::utils::memory::AddressError::Ineffective => {
+                    core.intctler.interrupt(InterruptId::InaccessibleAddress);
+                    core.regs.imsg = src;
+                    return 0;
+                }
             }
-            crate::utils::memory::AddressError::WrongPrivilege => {
-                core.intctler.interrupt(InterruptId::WrongPrivilege);
-                core.regs.imsg = src;
-                // 跨特权级访问，无法恢复
-                // 程序直接停止，不能继续运行
-                return 0;
-            }
-            crate::utils::memory::AddressError::Unreadable => {
-                panic!("出现了意外情况，在写寻址时返回了不可读错误")
-            }
-            crate::utils::memory::AddressError::Unwritable => {
-                core.intctler.interrupt(InterruptId::PageOrTableUnwritable);
-                core.regs.imsg = core.regs.imsg;
-                return 0;
-            }
-            crate::utils::memory::AddressError::Ineffective => {
-                core.intctler.interrupt(InterruptId::InaccessibleAddress);
-                core.regs.imsg = src;
-                return 0;
-            }
-        },
     };
     let src = match inst[2] {
         0 => vec![(src & 0xff) as u8],
@@ -820,12 +793,10 @@ pub fn i_stm(inst: &[u8], core: &mut Vcore) -> u64 {
         }
         _ => vec![],
     };
-    core.memory
-        .borrow_mut()
-        .write_slice(core.regs.x[inst[1].higher() as usize], &src);
+    core.memory.borrow_mut().write_slice(core.regs.x[inst[1].higher() as usize], &src);
     core.regs.flag.mark_symbol(
         core.regs.x[inst[1].lower() as usize],
-        core.regs.x[inst[1].lower() as usize],
+        core.regs.x[inst[1].lower() as usize]
     );
     3
 }
@@ -941,12 +912,23 @@ pub fn i_cpuid(_inst: &[u8], core: &mut Vcore) -> u64 {
         3 => {
             let mut i = 0usize;
             let tar = core.regs.x[1];
-            while *core.memory().borrow().at(tar + i as u64) != 0 {
+            while
+                *core
+                    .memory()
+                    .borrow()
+                    .at(tar + (i as u64)) != 0
+            {
                 i += 1;
             }
-            let s = core.memory().borrow().slice(tar, i as u64);
+            let tar = core.memory
+                .address(tar, core.regs.flag, core.regs.kpt, core.regs.upt, ReadWrite::Read)
+                .unwrap();
+            let s = core
+                .memory()
+                .borrow()
+                .slice(tar, i as u64);
             let s = String::from_utf8_lossy(s).to_string();
-            println!("{}", s);
+            core.deliver_string(s);
         }
         4 => {
             core.regs.x[0] = 1;

@@ -18,7 +18,7 @@ section .text starts=0x100
 #boot
 
 ldi $0, %x0
-
+ei
 #
     nop
 loop %x0, *p
@@ -26,8 +26,15 @@ loop %x0, *p
 section .data
 
 #time
-
 dq $0
+
+#clock_msg
+db $99
+db $108
+db $111
+db $99
+db $107
+db $0
 
 section .text.irh align=8
 
@@ -48,6 +55,10 @@ ldi *.data.time, %x1
 ldm %x1, %x2
 inc %x2
 stm %x2, %x1
+
+ldi $3, %x0
+ldi *.data.clock_msg, %x1
+cpuid
 
 ir $1
 

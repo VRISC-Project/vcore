@@ -5,6 +5,7 @@ use crate::{
     vrisc::vcore::{BitOptions, FlagRegFlag},
 };
 
+#[derive(Debug)]
 pub enum AddressError {
     OverSized(u64),
     WrongPrivilege,
@@ -15,8 +16,6 @@ pub enum AddressError {
 
 #[derive(Debug, Clone)]
 /// ## vcore的内存
-///
-/// 专门用于vcore
 pub struct Memory {
     memory: SharedPointer<u8>,
 
@@ -70,7 +69,7 @@ impl Memory {
 
     /// ## 惰性计算地址
     ///
-    /// 物理地址不用说。
+    /// 物理地址直接返回
     ///
     /// 逻辑地址寻址时，先查看缓存，缓存中有则直接使用，没有才去访问页表计算物理地址
     pub fn address(
