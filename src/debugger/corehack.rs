@@ -1,13 +1,19 @@
-use std::io::{ Stdout, Write };
+use std::io::{Stdout, Write};
 
-use crossterm::{ execute, style::{ Attribute, Print, SetAttribute } };
+use crossterm::{
+    execute,
+    style::{Attribute, Print, SetAttribute},
+};
 
 use crate::{
-    utils::{ memory::Memory, rdxparse::RadixParse, shared::SharedPointer },
+    utils::{memory::Memory, rdxparse::RadixParse, shared::SharedPointer},
     vrisc::vcore::DebugMode,
 };
 
-use super::{ debug::{ Regs, VdbApi }, terminal::Terminal };
+use super::{
+    debug::{Regs, VdbApi},
+    terminal::Terminal,
+};
 
 fn arg_loss(stdout: &mut Stdout) {
     write!(*stdout, "缺少参数, 输入\"core help\"获得帮助\n").unwrap();
@@ -46,7 +52,7 @@ pub fn run(
     stdout: &mut Stdout,
     debugging_core: &mut Option<usize>,
     debug_ports: &mut Vec<SharedPointer<VdbApi>>,
-    memory: &mut Memory
+    memory: &mut Memory,
 ) {
     if cmd.len() == 0 {
         arg_loss(stdout);
@@ -105,7 +111,8 @@ pub fn run(
                 Print("Usage"),
                 SetAttribute(Attribute::NoUnderline),
                 Print(": core [options]\n\n")
-            ).unwrap();
+            )
+            .unwrap();
             Terminal::newline(stdout);
             execute!(
                 stdout,
@@ -113,19 +120,25 @@ pub fn run(
                 Print("Options"),
                 SetAttribute(Attribute::NoUnderline),
                 Print(": \n")
-            ).unwrap();
+            )
+            .unwrap();
             Terminal::newline(stdout);
             write!(
                 stdout,
                 "  debug <core_id>               进入某个核心，之后的一切操作都是对于此核心的\n"
-            ).unwrap();
+            )
+            .unwrap();
             Terminal::newline(stdout);
             write!(
                 stdout,
                 "  register [<register> <value>] 寄存器操作, 没有参数则读取寄存器, 有参数则将value写入register中\n"
             ).unwrap();
             Terminal::newline(stdout);
-            write!(stdout, "  instruction                   查看当前ip指向的指令id\n").unwrap();
+            write!(
+                stdout,
+                "  instruction                   查看当前ip指向的指令id\n"
+            )
+            .unwrap();
             Terminal::newline(stdout);
             write!(stdout, "  start                         启动当前核心\n").unwrap();
             Terminal::newline(stdout);
@@ -137,7 +150,8 @@ pub fn run(
             write!(
                 stdout,
                 "  continue                      在step模式下有效, 执行下一条指令\n"
-            ).unwrap();
+            )
+            .unwrap();
             Terminal::newline(stdout);
             write!(stdout, "  interrupt <interrupt_id>      产生一个中断\n").unwrap();
             Terminal::newline(stdout);
@@ -146,7 +160,12 @@ pub fn run(
             write!(stdout, "  help                          打印此帮助文档\n").unwrap();
         }
         _ => {
-            write!(*stdout, "未知命令\"core {}\", 输入\"core help\"获得帮助\n", cmd[0]).unwrap();
+            write!(
+                *stdout,
+                "未知命令\"core {}\", 输入\"core help\"获得帮助\n",
+                cmd[0]
+            )
+            .unwrap();
         }
     }
 }
@@ -155,7 +174,7 @@ fn interrupt(
     cmd: &mut Vec<String>,
     stdout: &mut Stdout,
     debugging_core: &mut Option<usize>,
-    debug_ports: &mut Vec<SharedPointer<VdbApi>>
+    debug_ports: &mut Vec<SharedPointer<VdbApi>>,
 ) {
     if cmd.len() == 0 {
         arg_loss(stdout);
@@ -183,13 +202,15 @@ fn instruction(
     stdout: &mut Stdout,
     debugging_core: &mut Option<usize>,
     debug_ports: &mut Vec<SharedPointer<VdbApi>>,
-    memory: &mut Memory
+    memory: &mut Memory,
 ) {
     if *debugging_core == None {
         core_not_entered(stdout);
         return;
     }
-    let result = debug_ports[debugging_core.unwrap()].at_mut(0).get_result(VdbApi::Register(None));
+    let result = debug_ports[debugging_core.unwrap()]
+        .at_mut(0)
+        .get_result(VdbApi::Register(None));
     let regs = if let VdbApi::Register(Some(regs)) = result {
         regs.clone()
     } else if let VdbApi::NotRunning = result {
@@ -207,7 +228,7 @@ fn register(
     cmd: &mut Vec<String>,
     stdout: &mut Stdout,
     debugging_core: &mut Option<usize>,
-    debug_ports: &mut Vec<SharedPointer<VdbApi>>
+    debug_ports: &mut Vec<SharedPointer<VdbApi>>,
 ) {
     if cmd.len() == 0 {
         register_get(stdout, debugging_core, debug_ports);
@@ -220,7 +241,7 @@ fn register_write(
     cmd: &mut Vec<String>,
     stdout: &mut Stdout,
     debugging_core: &mut Option<usize>,
-    debug_ports: &mut Vec<SharedPointer<VdbApi>>
+    debug_ports: &mut Vec<SharedPointer<VdbApi>>,
 ) {
     if cmd.len() < 2 {
         arg_loss(stdout);
@@ -276,13 +297,15 @@ fn register_write(
 fn register_get(
     stdout: &mut Stdout,
     debugging_core: &mut Option<usize>,
-    debug_ports: &mut Vec<SharedPointer<VdbApi>>
+    debug_ports: &mut Vec<SharedPointer<VdbApi>>,
 ) {
     if *debugging_core == None {
         core_not_entered(stdout);
         return;
     }
-    let result = debug_ports[debugging_core.unwrap()].at_mut(0).get_result(VdbApi::Register(None));
+    let result = debug_ports[debugging_core.unwrap()]
+        .at_mut(0)
+        .get_result(VdbApi::Register(None));
     let regs = if let VdbApi::Register(Some(regs)) = result {
         regs.clone()
     } else if let VdbApi::NotRunning = result {
@@ -322,13 +345,15 @@ fn register_get(
 fn start(
     stdout: &mut Stdout,
     debugging_core: &mut Option<usize>,
-    debug_ports: &mut Vec<SharedPointer<VdbApi>>
+    debug_ports: &mut Vec<SharedPointer<VdbApi>>,
 ) {
     if *debugging_core == None {
         core_not_entered(stdout);
         return;
     }
-    let result = debug_ports[debugging_core.unwrap()].at_mut(0).get_result(VdbApi::StartCore);
+    let result = debug_ports[debugging_core.unwrap()]
+        .at_mut(0)
+        .get_result(VdbApi::StartCore);
     if let VdbApi::CoreStarted = result {
         write!(stdout, "核心{}已启动\n", debugging_core.unwrap()).unwrap();
     } else if let VdbApi::Ok = result {
@@ -341,7 +366,7 @@ fn mode(
     cmd: &mut Vec<String>,
     stdout: &mut Stdout,
     debugging_core: &mut Option<usize>,
-    debug_ports: &mut Vec<SharedPointer<VdbApi>>
+    debug_ports: &mut Vec<SharedPointer<VdbApi>>,
 ) {
     if cmd.len() == 0 {
         arg_loss(stdout);
@@ -355,14 +380,18 @@ fn mode(
         "step" => DebugMode::Step,
         "none" => DebugMode::None,
         _ => {
-            write!(*stdout, "参数\"{}\"不是合法的值, 输入\"core help\"获得帮助\n", cmd[0]).unwrap();
+            write!(
+                *stdout,
+                "参数\"{}\"不是合法的值, 输入\"core help\"获得帮助\n",
+                cmd[0]
+            )
+            .unwrap();
             return;
         }
     };
-    if
-        let VdbApi::Ok = debug_ports[debugging_core.unwrap()]
-            .at_mut(0)
-            .get_result(VdbApi::DebugMode(mode))
+    if let VdbApi::Ok = debug_ports[debugging_core.unwrap()]
+        .at_mut(0)
+        .get_result(VdbApi::DebugMode(mode))
     {
     } else {
         core_noresult(stdout, debugging_core);
@@ -372,13 +401,15 @@ fn mode(
 fn continue_instruction(
     stdout: &mut Stdout,
     debugging_core: &mut Option<usize>,
-    debug_ports: &mut Vec<SharedPointer<VdbApi>>
+    debug_ports: &mut Vec<SharedPointer<VdbApi>>,
 ) {
     if *debugging_core == None {
         core_not_entered(stdout);
         return;
     }
-    let result = debug_ports[debugging_core.unwrap()].at_mut(0).get_result(VdbApi::Continue);
+    let result = debug_ports[debugging_core.unwrap()]
+        .at_mut(0)
+        .get_result(VdbApi::Continue);
     if let VdbApi::NotRunning = result {
         core_not_runnig(stdout, debugging_core);
     } else if let VdbApi::Ok = result {
@@ -387,7 +418,8 @@ fn continue_instruction(
             stdout,
             "核心{}的debug模式是none, core cont命令无效\n",
             debugging_core.unwrap()
-        ).unwrap();
+        )
+        .unwrap();
     } else {
         core_noresult(stdout, debugging_core);
     }

@@ -1,6 +1,13 @@
-use std::{ u8, sync::mpsc::{ self, Sender }, thread };
+use std::{
+    collections::HashMap,
+    sync::mpsc::{self, Sender},
+    thread, u8,
+};
 
-use crate::utils::memory::{ AddressError, Memory, ReadWrite };
+use crate::utils::{
+    memory::{AddressError, Memory, ReadWrite},
+    shared::SharedPointer,
+};
 
 use super::base;
 
@@ -227,7 +234,11 @@ impl InterruptController {
     }
 
     pub fn interrupted(&self) -> Option<InterruptId> {
-        if self.intflag { Some(self.intid) } else { None }
+        if self.intflag {
+            Some(self.intid)
+        } else {
+            None
+        }
     }
 
     pub fn reset_intflag(&mut self) {
@@ -250,6 +261,7 @@ pub enum DebugMode {
 }
 
 /// ## 惰性寻址系统
+///
 /// hot_ip时栈上储存的ip寄存器的寻址后值，只有这个值每运行一次指令改变一次。
 ///
 /// 此ip不重新寻址，因为在一个页内，物理地址与线性地址一一对应。
@@ -260,7 +272,8 @@ pub enum DebugMode {
 /// * 产生转移：转移很可能导致ip不在此页中
 /// * 遇到最小页边界：此时地址大概率不在同一页中。“大概率”指有时分页会有大页，在大页中的较小页边界两侧的内存
 ///         都在同一页中，但是由于最小页有16KB，遇到最小页边界的概率也不大，判断一个最小页边界是否是此页
-///         的边界会消耗更多时间（这得从顶级页表开始一级一级地查才能查到）。
+///         的边界会消耗更多时间（这得从顶级页表开始一级一级地查才能查到）。因此只要遇到最小页边界就更新，
+///         不要判断是否确实是页边界。
 ///
 /// 在此顺便说明，core.ip_increment是自core.regs.ip被同步以来的总increment
 pub struct LazyAddress {
@@ -275,6 +288,133 @@ impl LazyAddress {
             hot_ip: 0,
             had_run_inst: false,
             crossed_page: false,
+        }
+    }
+}
+
+pub struct IOPortBuffer {
+    ifront: usize,
+    irear: usize,
+    ibuffer: [u64; 4096],
+
+    ofront: usize,
+    orear: usize,
+    obuffer: [u64; 4096],
+}
+
+impl IOPortBuffer {
+    pub fn core_push(&mut self, data: u64) {
+        self.obuffer[self.orear] = data;
+        self.orear += 1;
+        if self.orear == 4096 {
+            self.orear = 0;
+        }
+    }
+
+    pub fn device_push(&mut self, data: u64) {
+        self.ibuffer[self.irear] = data;
+        self.irear += 1;
+        if self.irear == 4096 {
+            self.irear = 0;
+        }
+    }
+
+    pub fn core_get(&mut self) -> Result<u64, ()> {
+        if self.ifront == self.irear {
+            return Err(());
+        }
+        let x = self.ibuffer[self.ifront];
+        self.ifront += 1;
+        if self.ifront == 4096 {
+            self.ifront = 0;
+        }
+        Ok(x)
+    }
+
+    pub fn device_get(&mut self) -> Result<u64, ()> {
+        if self.ofront == self.orear {
+            return Err(());
+        }
+        let x = self.obuffer[self.ofront];
+        self.ofront += 1;
+        if self.ofront == 4096 {
+            self.ofront = 0;
+        }
+        Ok(x)
+    }
+}
+
+/// ## 核心IO控制器
+pub struct IOController {
+    /// ## 请求端口
+    ///
+    /// (port: u16, lock: bool)
+    /// port初始值为0， lock初始值为false；
+    /// 请求时将锁锁住，等待thr_pushreq为请求分配端口，写入port中；
+    /// 然后将锁解锁，连接到指定port。
+    ///
+    /// 由于无法为(u16, bool)实现Send trait，使用u32代替
+    pub reqport: SharedPointer<u32>,
+
+    /// ## 端口
+    ///
+    /// 端口号对应的端口结构存在这里。
+    pub ports: HashMap<u16, SharedPointer<IOPortBuffer>>,
+
+    /// ## 端口请求分配器
+    ///
+    /// 通过这个Sender把分配的端口发送给某个核心，
+    /// vec中每个Sender对应一个核心的Reciever。
+    pub port_deliver: Vec<Sender<u16>>,
+}
+
+unsafe impl Send for IOController {}
+unsafe impl Sync for IOController {}
+
+impl IOController {
+    pub fn new(delivers: Vec<Sender<u16>>) -> Self {
+        Self {
+            reqport: SharedPointer::<u32>::new(String::from("VcoreIORequestPort"), 1).unwrap(),
+            ports: HashMap::new(),
+            port_deliver: delivers,
+        }
+    }
+
+    pub fn thr_dispatch_ioreq(&mut self) {
+        self.reqport.write(0, 0);
+        let mut port_id = 256u16;
+        loop {
+            for sender in self.port_deliver.iter_mut() {
+                while !((self.reqport.at(0) >> 16) != 0) {}
+                *self.reqport.at_mut(0) = (port_id as u32) + (*self.reqport.at(0) & 0xffff0000);
+                while (self.reqport.at(0) >> 16) != 0 {}
+                *self.reqport.at_mut(0) = 0 + (*self.reqport.at(0) & 0xffff0000);
+                sender.send(port_id).unwrap();
+                self.ports.insert(
+                    port_id,
+                    SharedPointer::new(format!("VcoreIOPort{}", port_id), 1).unwrap(),
+                );
+                port_id += 1;
+            }
+        }
+    }
+
+    pub fn do_solid_ports_services(
+        ports: &mut Vec<Vec<SharedPointer<IOPortBuffer>>>,
+        mut startflgs: Vec<SharedPointer<(bool, u64)>>,
+    ) {
+        for core in ports {
+            // port 0: 设备连接端口
+            // 不在这里实现
+            // port 1: 多核唤醒
+            if let Ok(data) = core[1].at_mut(0).device_get() {
+                let (core, ip) = {
+                    let d1 = data & 0xffff_ffff;
+                    let data = data >> 32;
+                    (d1, data)
+                };
+                startflgs[core as usize].write(0, (true, ip));
+            }
         }
     }
 }
@@ -321,7 +461,13 @@ pub struct Vcore {
     ///
     /// > `nop`指令详见vrisc结构文档
     pub nopflag: bool,
+
+    /// ## 调试模式
+    ///
+    /// 在debugger开启时有效，
     pub debug_mode: DebugMode,
+
+    pub io_ports: HashMap<u16, SharedPointer<IOPortBuffer>>,
 
     /// ## 终端显示管道
     termstr_pipe: Sender<String>,
@@ -330,11 +476,9 @@ pub struct Vcore {
 impl Vcore {
     pub fn new(id: usize, total_core: usize, memory: Memory) -> Self {
         let (tx, rx) = mpsc::channel();
-        thread::spawn(move || {
-            loop {
-                let s = { rx.recv().unwrap() };
-                println!("{}", s);
-            }
+        thread::spawn(move || loop {
+            let s = { rx.recv().unwrap() };
+            println!("{}", s);
         });
         Vcore {
             id,
@@ -348,13 +492,43 @@ impl Vcore {
             transferred: true,
             nopflag: false,
             debug_mode: DebugMode::None,
+            io_ports: HashMap::new(),
             termstr_pipe: tx,
         }
     }
 
-    /// 将基本指令集加载到指令空间中
+    pub fn add_port(&mut self, port: u16, solid: bool, core: usize) {
+        self.io_ports.insert(
+            port,
+            SharedPointer::bind(
+                if solid {
+                    format!("VcoreIOPort{}C{}", port, core)
+                } else {
+                    format!("VcoreIOPort{}", port)
+                },
+                1,
+            )
+            .unwrap(),
+        );
+    }
+
+    /// 初始化指令集和io
     pub fn init(&mut self) {
         self.instruction_space[..64].copy_from_slice(&base::BASE);
+        for i in 0..256 {
+            self.add_port(i, true, self.id());
+        }
+    }
+
+    #[inline]
+    pub fn link_device(&mut self, port: u16) {
+        self.add_port(port, false, self.id());
+        self.intctler.interrupt(InterruptId::Device);
+        self.io_ports
+            .get_mut(&0)
+            .unwrap()
+            .at_mut(0)
+            .device_push(port as u64);
     }
 
     #[inline]
@@ -377,7 +551,10 @@ impl Vcore {
             self.regs.flag.bit_reset(FlagRegFlag::InterruptEnabled);
             self.regs.flag.bit_reset(FlagRegFlag::Privilege);
 
-            let target = self.memory.borrow().slice(self.regs.ivt + 8 * (intid as u64), 8);
+            let target = self
+                .memory
+                .borrow()
+                .slice(self.regs.ivt + 8 * (intid as u64), 8);
             let mut addr = 0u64;
             for i in 0..8 {
                 addr |= (target[i] as u64) << (i * 8);
@@ -444,47 +621,41 @@ impl Vcore {
                 self.lazyaddr.had_run_inst = false;
             }
         }
-        if
-            self.transferred ||
-            self.lazyaddr.hot_ip % (16 * 1024) == 0 ||
-            self.lazyaddr.crossed_page
+        if self.transferred || self.lazyaddr.hot_ip % (16 * 1024) == 0 || self.lazyaddr.crossed_page
         {
-            self.lazyaddr.hot_ip = match
-                self.memory.address(
-                    self.regs.ip,
-                    self.regs.flag,
-                    self.regs.kpt,
-                    self.regs.upt,
-                    ReadWrite::Read
-                )
-            {
+            self.lazyaddr.hot_ip = match self.memory.address(
+                self.regs.ip,
+                self.regs.flag,
+                self.regs.kpt,
+                self.regs.upt,
+                ReadWrite::Read,
+            ) {
                 Ok(address) => address,
-                Err(error) =>
-                    match error {
-                        AddressError::OverSized(address) => {
-                            self.intctler.interrupt(InterruptId::InaccessibleAddress);
-                            self.regs.imsg = address;
-                            return true;
-                        }
-                        AddressError::WrongPrivilege => {
-                            self.intctler.interrupt(InterruptId::WrongPrivilege);
-                            self.regs.imsg = self.regs.ip;
-                            return true;
-                        }
-                        AddressError::Unreadable => {
-                            self.intctler.interrupt(InterruptId::PageOrTableUnreadable);
-                            self.regs.imsg = self.regs.imsg;
-                            return true;
-                        }
-                        AddressError::Unwritable => {
-                            panic!("出现了意外情况，在读寻址时返回了不可写错误")
-                        }
-                        AddressError::Ineffective => {
-                            self.intctler.interrupt(InterruptId::InaccessibleAddress);
-                            self.regs.imsg = self.regs.ip;
-                            return true;
-                        }
+                Err(error) => match error {
+                    AddressError::OverSized(address) => {
+                        self.intctler.interrupt(InterruptId::InaccessibleAddress);
+                        self.regs.imsg = address;
+                        return true;
                     }
+                    AddressError::WrongPrivilege => {
+                        self.intctler.interrupt(InterruptId::WrongPrivilege);
+                        self.regs.imsg = self.regs.ip;
+                        return true;
+                    }
+                    AddressError::Unreadable => {
+                        self.intctler.interrupt(InterruptId::PageOrTableUnreadable);
+                        self.regs.imsg = self.regs.imsg;
+                        return true;
+                    }
+                    AddressError::Unwritable => {
+                        panic!("出现了意外情况，在读寻址时返回了不可写错误")
+                    }
+                    AddressError::Ineffective => {
+                        self.intctler.interrupt(InterruptId::InaccessibleAddress);
+                        self.regs.imsg = self.regs.ip;
+                        return true;
+                    }
+                },
             };
             self.transferred = false;
             self.lazyaddr.crossed_page = false;
@@ -509,53 +680,55 @@ impl Vcore {
         self.ip_increment = 0;
         let inst_st = self.lazyaddr.hot_ip; //最后14位为0
         let inst_end = self.lazyaddr.hot_ip + instlen;
-        if
-            (inst_st & 0xffff_ffff_ffff_c000) == (inst_end & 0xffff_ffff_ffff_c000) ||
-            inst_end == (inst_end & 0xffff_ffff_ffff_c000)
+        if (inst_st & 0xffff_ffff_ffff_c000) == (inst_end & 0xffff_ffff_ffff_c000)
+            || inst_end == (inst_end & 0xffff_ffff_ffff_c000)
         {
             //指令未跨页
-            (self.memory().borrow().slice(self.lazyaddr.hot_ip, instlen).to_vec(), false)
+            (
+                self.memory()
+                    .borrow()
+                    .slice(self.lazyaddr.hot_ip, instlen)
+                    .to_vec(),
+                false,
+            )
         } else {
             //指令跨页
             let firstl = inst_end & (0xffff_ffff_ffff_c000 - inst_st);
             let lastl = (inst_end - inst_end) & 0xffff_ffff_ffff_c000;
             inst.copy_from_slice(self.memory().borrow().slice(inst_st, firstl));
-            let last_st = match
-                self.memory.address(
-                    self.regs.ip + firstl,
-                    self.regs.flag,
-                    self.regs.kpt,
-                    self.regs.upt,
-                    ReadWrite::Read
-                )
-            {
+            let last_st = match self.memory.address(
+                self.regs.ip + firstl,
+                self.regs.flag,
+                self.regs.kpt,
+                self.regs.upt,
+                ReadWrite::Read,
+            ) {
                 Ok(address) => address,
-                Err(error) =>
-                    match error {
-                        AddressError::OverSized(address) => {
-                            self.intctler.interrupt(InterruptId::InaccessibleAddress);
-                            self.regs.imsg = address;
-                            return (Vec::new(), true);
-                        }
-                        AddressError::WrongPrivilege => {
-                            self.intctler.interrupt(InterruptId::WrongPrivilege);
-                            self.regs.imsg = self.regs.ip;
-                            return (Vec::new(), true);
-                        }
-                        AddressError::Unreadable => {
-                            self.intctler.interrupt(InterruptId::PageOrTableUnreadable);
-                            self.regs.imsg = self.regs.imsg;
-                            return (Vec::new(), true);
-                        }
-                        AddressError::Unwritable => {
-                            panic!("出现了意外情况，在读寻址时返回了不可写错误")
-                        }
-                        AddressError::Ineffective => {
-                            self.intctler.interrupt(InterruptId::InaccessibleAddress);
-                            self.regs.imsg = self.regs.ip + firstl;
-                            return (Vec::new(), true);
-                        }
+                Err(error) => match error {
+                    AddressError::OverSized(address) => {
+                        self.intctler.interrupt(InterruptId::InaccessibleAddress);
+                        self.regs.imsg = address;
+                        return (Vec::new(), true);
                     }
+                    AddressError::WrongPrivilege => {
+                        self.intctler.interrupt(InterruptId::WrongPrivilege);
+                        self.regs.imsg = self.regs.ip;
+                        return (Vec::new(), true);
+                    }
+                    AddressError::Unreadable => {
+                        self.intctler.interrupt(InterruptId::PageOrTableUnreadable);
+                        self.regs.imsg = self.regs.imsg;
+                        return (Vec::new(), true);
+                    }
+                    AddressError::Unwritable => {
+                        panic!("出现了意外情况，在读寻址时返回了不可写错误")
+                    }
+                    AddressError::Ineffective => {
+                        self.intctler.interrupt(InterruptId::InaccessibleAddress);
+                        self.regs.imsg = self.regs.ip + firstl;
+                        return (Vec::new(), true);
+                    }
+                },
             };
             inst.append(&mut self.memory().borrow().slice_mut(last_st, lastl).to_vec());
             self.lazyaddr.crossed_page = true;

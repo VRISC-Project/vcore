@@ -58,6 +58,9 @@ pub struct SharedPointer<T> {
     hdl: *mut c_void,
 }
 
+unsafe impl<T> Send for SharedPointer<T> {}
+unsafe impl<T> Sync for SharedPointer<T> {}
+
 impl<T> SharedPointer<T> {
     #[cfg(target_os = "linux")]
     pub fn new(name: String, size: usize) -> Result<Self, Errno> {
@@ -102,16 +105,16 @@ impl<T> SharedPointer<T> {
                 INVALID_HANDLE_VALUE,
                 0 as *mut SECURITY_ATTRIBUTES,
                 PAGE_READWRITE,
-                (size * size_of::<T>() >> 32) as u32,
+                ((size * size_of::<T>()) >> 32) as u32,
                 (size * size_of::<T>()) as u32,
                 namew.as_ptr(),
             )
         };
-        if hdl == 0 as *mut c_void {
+        if hdl == (0 as *mut c_void) {
             return Err(MapError::CreateFileMappingError(unsafe { GetLastError() }));
         }
         let addr = unsafe { MapViewOfFile(hdl, FILE_MAP_ALL_ACCESS, 0, 0, 0) };
-        if addr == 0 as *mut c_void {
+        if addr == (0 as *mut c_void) {
             return Err(MapError::MapViewOfFileError(unsafe { GetLastError() }));
         }
         Ok(SharedPointer {
@@ -163,11 +166,11 @@ impl<T> SharedPointer<T> {
         }
         let namew = namev.as_slice();
         let hdl = unsafe { OpenFileMappingW(PAGE_READWRITE, false as i32, namew.as_ptr()) };
-        if hdl == 0 as *mut c_void {
+        if hdl == (0 as *mut c_void) {
             return Err(MapError::CreateFileMappingError(unsafe { GetLastError() }));
         }
         let addr = unsafe { MapViewOfFile(hdl, FILE_MAP_ALL_ACCESS, 0, 0, 0) };
-        if addr == 0 as *mut c_void {
+        if addr == (0 as *mut c_void) {
             return Err(MapError::MapViewOfFileError(unsafe { GetLastError() }));
         }
         Ok(SharedPointer {
@@ -187,7 +190,9 @@ impl<T> SharedPointer<T> {
 impl<T> Drop for SharedPointer<T> {
     #[cfg(target_os = "linux")]
     fn drop(&mut self) {
-        unsafe { sys::mman::munmap(self.pointer.cast(), self.size).unwrap() };
+        unsafe {
+            sys::mman::munmap(self.pointer.cast(), self.size).unwrap();
+        }
         unistd::close(self.fd).unwrap();
         self.pointer = 0 as *mut T;
     }
@@ -207,18 +212,18 @@ impl<T> Drop for SharedPointer<T> {
 impl<T> SharedPointer<T> {
     #[inline]
     pub fn slice<'a>(&self, addr: u64, mut len: u64) -> &'a [T] {
-        if (addr + len) as usize > self.size {
-            len = self.size as u64 - addr;
+        if ((addr + len) as usize) > self.size {
+            len = (self.size as u64) - addr;
         }
         unsafe { slice::from_raw_parts(self.pointer.add(addr as usize), len as usize) }
     }
 
     #[inline]
     pub fn slice_mut<'a>(&self, addr: u64, mut len: u64) -> &'a mut [T] {
-        if (addr + len) as usize > self.size {
-            len = self.size as u64 - addr;
+        if ((addr + len) as usize) > self.size {
+            len = (self.size as u64) - addr;
         }
-        unsafe { slice::from_raw_parts_mut((self.pointer as u64 + addr) as *mut T, len as usize) }
+        unsafe { slice::from_raw_parts_mut(((self.pointer as u64) + addr) as *mut T, len as usize) }
     }
 
     #[inline]
@@ -227,25 +232,27 @@ impl<T> SharedPointer<T> {
     }
 
     #[inline]
-    pub fn at_mut<'a>(&self, addr: u64) -> &'a mut T {
+    pub fn at_mut<'a>(&mut self, addr: u64) -> &'a mut T {
         unsafe { &mut *self.pointer.add(addr as usize) }
     }
 
     #[inline]
     pub fn write(&mut self, addr: u64, t: T) {
         if (addr as usize) < self.size {
-            unsafe { *self.pointer.add(addr as usize) = t };
+            unsafe {
+                *self.pointer.add(addr as usize) = t;
+            }
         }
     }
 
     #[inline]
     pub fn write_slice(&mut self, addr: u64, s: &[T]) {
-        if addr as usize + s.len() < self.size {
+        if (addr as usize) + s.len() < self.size {
             unsafe {
                 self.pointer
                     .add(addr as usize)
                     .copy_from(s.as_ptr(), s.len())
-            };
+            }
         }
     }
 }

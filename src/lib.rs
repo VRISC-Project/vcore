@@ -8,21 +8,31 @@ use core::panic;
 use debugger::debug::DebuggerBackend;
 #[cfg(target_os = "linux")]
 use nix::unistd;
-use std::{ fs::File, io::Read, process::exit, thread, time::Duration };
+use std::{
+    fs::File,
+    io::Read,
+    process::exit,
+    sync::{
+        mpsc::{self, Receiver},
+        Arc, RwLock,
+    },
+    thread,
+    time::Duration,
+};
 #[cfg(target_os = "windows")]
-use std::{ mem::size_of, ptr::null_mut };
+use std::{mem::size_of, ptr::null_mut};
 #[cfg(target_os = "windows")]
 use winapi::um::{
     errhandlingapi::GetLastError,
     processthreadsapi::STARTUPINFOW,
-    processthreadsapi::{ CreateProcessW, PROCESS_INFORMATION },
+    processthreadsapi::{CreateProcessW, PROCESS_INFORMATION},
 };
 
 use config::Config;
 #[cfg(feature = "debugger")]
-use debugger::debug::{ Debugger, VdbApi };
-use utils::{ clock::Clock, memory::Memory, shared::SharedPointer };
-use vrisc::vcore::{ InterruptId, Vcore };
+use debugger::debug::{Debugger, VdbApi};
+use utils::{clock::Clock, memory::Memory, shared::SharedPointer};
+use vrisc::vcore::{IOController, IOPortBuffer, InterruptId, Vcore};
 
 /// # vcore从这里开始运行
 ///
@@ -43,12 +53,49 @@ use vrisc::vcore::{ InterruptId, Vcore };
 pub fn run(config: Config) {
     #[cfg(target_os = "windows")]
     if config.process_child {
-        vcore(config.memory, config.id_core, config.cores, config.debug, config.external_clock);
+        vcore(
+            config.memory,
+            config.id_core,
+            config.cores,
+            config.debug,
+            config.external_clock,
+        );
         exit(0);
     }
     let mut cores = Vec::new();
+
     let mut cores_startflg = Vec::new();
     let mut cores_inst_count = Vec::new();
+
+    // 初始化io相关数据结构
+    let mut ioreq_delivers = Vec::new();
+    let mut ioreq_receivers = Vec::new();
+    for _ in 0..config.cores {
+        let (tx, rx) = mpsc::channel();
+        ioreq_delivers.push(tx);
+        ioreq_receivers.push(rx);
+    }
+    let io_controller = IOController::new(ioreq_delivers);
+    let io_controller = Arc::new(RwLock::new(io_controller));
+    let solid_io_ports = {
+        let mut p = Vec::new();
+        for _ in 0..config.cores {
+            p.push(Vec::new());
+        }
+        let mut c = 0;
+        for cp in p.iter_mut() {
+            for i in 0..256 {
+                cp.push(
+                    SharedPointer::<IOPortBuffer>::new(format!("VcoreIOPort{}C{}", i, c), 1)
+                        .unwrap(),
+                );
+            }
+            c += 1;
+        }
+        p
+    };
+    let solid_io_ports = Arc::new(RwLock::new(solid_io_ports));
+
     #[cfg(feature = "debugger")]
     let mut cores_debug_port = Vec::new();
 
@@ -67,110 +114,56 @@ pub fn run(config: Config) {
         memory.borrow_mut().write_slice(0, rom.as_slice());
     }
 
+    let mut ioreq_receivers = ioreq_receivers.into_iter();
     for i in 0..config.cores {
-        cores_startflg.push(
-            SharedPointer::<bool>::new(format!("VcoreCore{}StartFlg", i), 1).unwrap()
-        );
-        cores_inst_count.push(
-            SharedPointer::<u64>::new(format!("VcoreCore{}InstCount", i), 1).unwrap()
-        );
+        cores_startflg
+            .push(SharedPointer::<(bool, u64)>::new(format!("VcoreCore{}StartFlg", i), 1).unwrap());
+        cores_inst_count
+            .push(SharedPointer::<u64>::new(format!("VcoreCore{}InstCount", i), 1).unwrap());
         #[cfg(feature = "debugger")]
-        cores_debug_port.push(
-            SharedPointer::<VdbApi>::new(format!("VcoreCore{}DebugApi", i), 1).unwrap()
-        );
+        cores_debug_port
+            .push(SharedPointer::<VdbApi>::new(format!("VcoreCore{}DebugApi", i), 1).unwrap());
         #[cfg(feature = "debugger")]
         cores_debug_port[i].write(0, VdbApi::None);
 
         if i == 0 && !config.debug {
             // core0在非debug模式下直接打开
-            cores_startflg[i].write(0, true);
+            cores_startflg[i].write(0, (true, 0));
         } else {
-            cores_startflg[i].write(0, false);
+            cores_startflg[i].write(0, (false, 0));
         }
         #[cfg(target_os = "linux")]
         match (unsafe { unistd::fork().unwrap() }) {
             unistd::ForkResult::Parent { child } => cores.push(child),
             unistd::ForkResult::Child => {
-                vcore(config.memory, i, config.cores, config.debug, config.external_clock);
+                vcore(
+                    config.memory,
+                    i,
+                    config.cores,
+                    config.debug,
+                    config.external_clock,
+                    ioreq_receivers.next().unwrap(),
+                );
                 exit(0);
             }
         }
         #[cfg(target_os = "windows")]
-        {
-            let mut si = STARTUPINFOW {
-                cb: size_of::<STARTUPINFOW>() as u32,
-                lpReserved: null_mut(),
-                lpDesktop: null_mut(),
-                lpTitle: null_mut(),
-                dwX: 0,
-                dwY: 0,
-                dwXSize: 0,
-                dwYSize: 0,
-                dwXCountChars: 0,
-                dwYCountChars: 0,
-                dwFillAttribute: 0,
-                dwFlags: 0,
-                wShowWindow: 0,
-                cbReserved2: 0,
-                lpReserved2: null_mut(),
-                hStdInput: null_mut(),
-                hStdOutput: null_mut(),
-                hStdError: null_mut(),
-            };
-            let mut pi = PROCESS_INFORMATION {
-                hProcess: null_mut(),
-                hThread: null_mut(),
-                dwProcessId: 0,
-                dwThreadId: 0,
-            };
-            let mut cmd = String::new();
-            let cmdp = {
-                for s in std::env::args() {
-                    cmd.push_str(&format!("{} ", s));
-                }
-                cmd.push_str("-p ");
-                cmd.push_str(&format!("-i {}", i));
-                let cmd = cmd.as_bytes();
-                let mut res = Vec::new();
-                let mut cmd = {
-                    for x in cmd {
-                        res.push(*x as u16);
-                    }
-                    res
-                };
-                cmd.as_mut_ptr()
-            };
-            println!("{}", cmd);
-            if
-                !(unsafe {
-                    if
-                        CreateProcessW(
-                            null_mut(),
-                            cmdp,
-                            null_mut(),
-                            null_mut(),
-                            false as i32,
-                            0,
-                            null_mut(),
-                            null_mut(),
-                            &mut si,
-                            &mut pi
-                        ) != 0
-                    {
-                        true
-                    } else {
-                        false
-                    }
-                })
-            {
-                panic!("Failed to create new process. {}", unsafe { GetLastError() });
-            }
-            cores.push(pi.hProcess);
-        }
+        {}
         #[cfg(target_os = "macos")]
-        {
-        }
+        {}
     }
+
+    let ref_io_controller = Arc::clone(&io_controller);
+    thread::spawn(move || {
+        ref_io_controller.write().unwrap().thr_dispatch_ioreq();
+    });
+
+    thread::spawn(move || {
+        IOController::do_solid_ports_services(
+            solid_io_ports.write().unwrap().as_mut(),
+            cores_startflg,
+        );
+    });
 
     #[cfg(feature = "debugger")]
     let mut debugger = if config.debug {
@@ -193,15 +186,20 @@ pub fn run(config: Config) {
 /// 首先绑定内存和与主进程通信的共享内存，然后等待核心被打开，最后进入核心主循环。
 ///
 /// 由于debugger的存在，执行一条指令的过程并没有在这里完全体现出来。
-fn vcore(memory_size: usize, id: usize, total_core: usize, debug: bool, external_clock: bool) {
-    let mut core_startflg = SharedPointer::<bool>
-        ::bind(format!("VcoreCore{}StartFlg", id), 1)
-        .unwrap();
+fn vcore(
+    memory_size: usize,
+    id: usize,
+    total_core: usize,
+    debug: bool,
+    external_clock: bool,
+    ioreq_receiver: Receiver<u16>,
+) {
+    let mut core_startflg =
+        SharedPointer::<(bool, u64)>::bind(format!("VcoreCore{}StartFlg", id), 1).unwrap();
     // 指令计数，计算从a开始运行到现在此核心共运行了多少条指令
     // 用于vcore父进程统计执行速度等
-    let mut core_instruction_count = SharedPointer::<u64>
-        ::bind(format!("VcoreCore{}InstCount", id), 1)
-        .unwrap();
+    let mut core_instruction_count =
+        SharedPointer::<u64>::bind(format!("VcoreCore{}InstCount", id), 1).unwrap();
     core_instruction_count.write(0, 0);
     // vcore核心
     let mut core = Vcore::new(id, total_core, Memory::bind(memory_size));
@@ -210,7 +208,7 @@ fn vcore(memory_size: usize, id: usize, total_core: usize, debug: bool, external
     // vcore debugger后端
     let mut debugger_backend = DebuggerBackend::new(id);
 
-    while !*core_startflg.at(0) {
+    while !core_startflg.at(0).0 {
         // 等待核心被允许开始
         thread::sleep(Duration::from_millis(1));
 
@@ -231,7 +229,16 @@ fn vcore(memory_size: usize, id: usize, total_core: usize, debug: bool, external
     // 内部时钟 (250Hz)
     let mut clock = Clock::new(4);
 
+    core.regs.ip = core_startflg.at(0).1;
+
     loop {
+        match ioreq_receiver.try_recv() {
+            Ok(port) => {
+                core.link_device(port);
+            }
+            _ => (),
+        }
+
         // 执行时钟
         if !debug && !external_clock && clock.hit() {
             core.intctler.interrupt(InterruptId::Clock);
@@ -247,15 +254,13 @@ fn vcore(memory_size: usize, id: usize, total_core: usize, debug: bool, external
         // debugger后端
         #[cfg(feature = "debugger")]
         if debug {
-            match
-                debugger_backend.after_start(
-                    core.lazyaddr.hot_ip,
-                    &mut core.regs,
-                    &mut core.intctler,
-                    &mut core.debug_mode,
-                    &mut core.memory
-                )
-            {
+            match debugger_backend.after_start(
+                core.lazyaddr.hot_ip,
+                &mut core.regs,
+                &mut core.intctler,
+                &mut core.debug_mode,
+                &mut core.memory,
+            ) {
                 Some(true) => {
                     continue;
                 }

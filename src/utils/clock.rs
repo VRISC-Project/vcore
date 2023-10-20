@@ -21,7 +21,7 @@ impl Clock {
 
     #[cfg(target_os = "linux")]
     /// ## 判断是否已经过了一个周期
-    /// 
+    ///
     /// 返回true时要产生一个中断
     pub fn hit(&mut self) -> bool {
         let mut tv = timeval {
