@@ -1,6 +1,10 @@
 use crate::utils::memory::ReadWrite;
 
-use super::vcore::{BitOptions, ConditionCode, FlagRegFlag, InterruptId, Vcore, VcoreInstruction};
+use super::vcore::{
+    intcontroller::InterruptId,
+    regs_flags::{ConditionCode, FlagRegFlag},
+    BitOptions, Vcore, VcoreInstruction,
+};
 
 /// ## 基本指令集
 pub const BASE: [Option<VcoreInstruction>; 64] = [
@@ -611,6 +615,7 @@ pub fn i_ir(inst: &[u8], core: &mut Vcore) -> u64 {
         core.transferred = true;
     } else {
         core.intctler.interrupt(InterruptId::InvalidInstruction);
+        core.regs.imsg = core.regs.ip + (core.ip_increment as u64);
     }
     0
 }
@@ -842,7 +847,7 @@ pub fn i_in(inst: &[u8], core: &mut Vcore) -> u64 {
         core.regs.x[src as usize] as u16
     };
     core.regs.x[tar as usize] = if let Some(port) = core.io_ports.get_mut(&src) {
-        if let Ok(x) = port.at_mut(0).core_get() {
+        if let Some(x) = port.at_mut(0).core_get() {
             x
         } else {
             0

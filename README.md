@@ -7,13 +7,13 @@ vrisc架构虚拟处理器。
 * 使用`vrom.img`作为启动镜像启动一个单核虚拟机:
 
 ```bash
-cargo run --bin vcore --release --features debugger -- -m 1048576 -v vrom.img -d
+cargo run --bin vcore --release -- -m 1048576 -v vrom.img -d
 ```
 
 * 查看`vcore`命令使用方法:
 
 ```bash
-cargo run --bin vcore --release --features debugger -- -h
+cargo run --bin vcore --release -- -h
 ```
 
 ## 说明
@@ -29,8 +29,10 @@ cargo run --bin vcore --release --features debugger -- -h
 * [0.2]
   * 重构vcore debugger，使debugger交互性更强，命令输入更舒适快捷。[v]
   * 实现分页机制。[v]
-  * 实现总线输入输出指令`in`和`out`。
-  * 加入对多核的完整支持，以前的版本只能在debugger中启动其它核心，新版本中可以通过机器指令访问总线打开核心。
+  * 实现总线输入输出指令`in`和`out`。[v]
+  * 加入对多核的完整支持，以前的版本只能在debugger中启动其它核心，新版本中可以通过机器指令访问总线打开核心。[v]
+  * 加入dma，使它能够顺利支持显示器和硬盘等设备。
+  * 加入扩展指令集。
 
 ## 特性
 

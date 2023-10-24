@@ -1,3 +1,9 @@
+pub mod addresser;
+pub mod dma;
+pub mod intcontroller;
+pub mod iocontroller;
+pub mod regs_flags;
+
 use std::{
     collections::HashMap,
     sync::mpsc::{self, Sender},
@@ -9,69 +15,24 @@ use crate::utils::{
     shared::SharedPointer,
 };
 
+use self::{
+    addresser::LazyAddress,
+    intcontroller::{InterruptController, InterruptId},
+    iocontroller::{IOPortBuffer, PortRequest},
+    regs_flags::{ConditionCode, FlagRegFlag, Registers},
+};
+
 use super::base;
 
 pub type VcoreInstruction = (fn(&[u8], &mut Vcore) -> u64, u64);
 
-/// flag寄存器的标志位
-///
-/// > 详见vrisc架构文档
-pub enum FlagRegFlag {
-    Zero = 0,
-    Symbol = 1,
-    Overflow = 2,
-    Equal = 3,
-    Higher = 4,
-    Lower = 5,
-    Bigger = 6,
-    Smaller = 7,
-    InterruptEnabled = 8,
-    PagingEnabled = 9,
-    Privilege = 10,
+#[derive(PartialEq, Clone, Copy, Debug)]
+pub enum DebugMode {
+    /// 不debug，正常执行
+    None,
 
-    UserSpace = 63,
-}
-
-/// 指令的条件码
-///
-/// > 详见vrisc架构文档
-pub enum ConditionCode {
-    None = 0,
-    Zero = 1,
-    Signed = 2,
-    Overflow = 3,
-    Equal = 4,
-    NonEqual = 5,
-    Higher = 6,
-    Lower = 7,
-    NonHigher = 8,
-    NonLower = 9,
-    Bigger = 10,
-    Smaller = 11,
-    NonBigger = 12,
-    NonSmaller = 13,
-}
-
-impl ConditionCode {
-    pub fn new(cond: u8) -> Self {
-        match cond {
-            0 => ConditionCode::None,
-            1 => ConditionCode::Zero,
-            2 => ConditionCode::Signed,
-            3 => ConditionCode::Overflow,
-            4 => ConditionCode::Equal,
-            5 => ConditionCode::NonEqual,
-            6 => ConditionCode::Higher,
-            7 => ConditionCode::Lower,
-            8 => ConditionCode::NonHigher,
-            9 => ConditionCode::NonLower,
-            10 => ConditionCode::Bigger,
-            11 => ConditionCode::Smaller,
-            12 => ConditionCode::NonBigger,
-            13 => ConditionCode::NonSmaller,
-            _ => ConditionCode::None,
-        }
-    }
+    /// 单步执行
+    Step,
 }
 
 /// ## 位操作
@@ -131,290 +92,6 @@ impl BitOptions for u64 {
             ConditionCode::Smaller => self.bit_get(FlagRegFlag::Smaller),
             ConditionCode::NonBigger => !self.bit_get(FlagRegFlag::Bigger),
             ConditionCode::NonSmaller => !self.bit_get(FlagRegFlag::Smaller),
-        }
-    }
-}
-
-/// vrisc寄存器
-#[derive(PartialEq, Clone, Copy, Debug)]
-pub struct Registers {
-    pub x: [u64; 16],
-    pub ip: u64,
-    pub flag: u64,
-    pub ivt: u64,
-    pub kpt: u64,
-    pub upt: u64,
-    pub scp: u64,
-    pub imsg: u64,
-    pub ipdump: u64,
-    pub flagdump: u64,
-}
-
-impl Registers {
-    pub fn new() -> Self {
-        Registers {
-            x: [0; 16],
-            ip: 0,
-            flag: 0,
-            ivt: 0,
-            kpt: 0,
-            upt: 0,
-            scp: 0,
-            imsg: 0,
-            ipdump: 0,
-            flagdump: 0,
-        }
-    }
-
-    pub fn reset(&mut self) {
-        self.x.copy_from_slice(&[0; 16]);
-        self.ip = 0;
-        self.flag = 0;
-        self.ivt = 0;
-        self.kpt = 0;
-        self.upt = 0;
-        self.scp = 0;
-        self.imsg = 0;
-        self.ipdump = 0;
-        self.flagdump = 0;
-    }
-}
-
-#[derive(Debug, Clone, Copy)]
-pub enum InterruptId {
-    NI = 0,
-    InaccessibleAddress = 1,
-    Device = 2,
-    Clock = 3,
-    InvalidInstruction = 4,
-    WrongPrivilege = 5,
-    InaccessibleIOPort = 6,
-    PageOrTableUnreadable = 7,
-    PageOrTableUnwritable = 8,
-}
-
-impl InterruptId {
-    /// 只要不在InterruptId中，都会返回NI（Not a Interrupt）
-    pub fn generate(id: u8) -> Self {
-        match id {
-            0 => InterruptId::NI,
-            1 => InterruptId::InaccessibleAddress,
-            2 => InterruptId::Device,
-            3 => InterruptId::Clock,
-            4 => InterruptId::InvalidInstruction,
-            5 => InterruptId::WrongPrivilege,
-            6 => InterruptId::InaccessibleIOPort,
-            7 => InterruptId::PageOrTableUnreadable,
-            8 => InterruptId::PageOrTableUnwritable,
-            _ => InterruptId::NI,
-        }
-    }
-}
-
-/// 中断控制器
-///
-/// 负责处理中断
-pub struct InterruptController {
-    intflag: bool,
-    /// 在intflag为`true`时使用
-    intid: InterruptId,
-}
-
-impl InterruptController {
-    pub fn new() -> Self {
-        InterruptController {
-            intflag: false,
-            intid: InterruptId::NI,
-        }
-    }
-
-    pub fn interrupt(&mut self, intid: InterruptId) {
-        self.intflag = true;
-        self.intid = intid;
-    }
-
-    pub fn interrupted(&self) -> Option<InterruptId> {
-        if self.intflag {
-            Some(self.intid)
-        } else {
-            None
-        }
-    }
-
-    pub fn reset_intflag(&mut self) {
-        self.intflag = false;
-    }
-
-    pub fn reset(&mut self) {
-        self.intflag = false;
-        self.intid = InterruptId::NI;
-    }
-}
-
-#[derive(PartialEq, Clone, Copy, Debug)]
-pub enum DebugMode {
-    /// 不debug，正常执行
-    None,
-
-    /// 单步执行
-    Step,
-}
-
-/// ## 惰性寻址系统
-///
-/// hot_ip时栈上储存的ip寄存器的寻址后值，只有这个值每运行一次指令改变一次。
-///
-/// 此ip不重新寻址，因为在一个页内，物理地址与线性地址一一对应。
-///
-/// 满足如下条件时，hot_ip同步至core.regs.ip：
-/// * 产生转移：需要将ip（中断转移还需flag）转存至dump寄存器
-/// 满足如下条件时，重新为hot_ip寻址：
-/// * 产生转移：转移很可能导致ip不在此页中
-/// * 遇到最小页边界：此时地址大概率不在同一页中。“大概率”指有时分页会有大页，在大页中的较小页边界两侧的内存
-///         都在同一页中，但是由于最小页有16KB，遇到最小页边界的概率也不大，判断一个最小页边界是否是此页
-///         的边界会消耗更多时间（这得从顶级页表开始一级一级地查才能查到）。因此只要遇到最小页边界就更新，
-///         不要判断是否确实是页边界。
-///
-/// 在此顺便说明，core.ip_increment是自core.regs.ip被同步以来的总increment
-pub struct LazyAddress {
-    pub hot_ip: u64,
-    pub had_run_inst: bool,
-    pub crossed_page: bool,
-}
-
-impl LazyAddress {
-    pub fn new() -> Self {
-        Self {
-            hot_ip: 0,
-            had_run_inst: false,
-            crossed_page: false,
-        }
-    }
-}
-
-pub struct IOPortBuffer {
-    ifront: usize,
-    irear: usize,
-    ibuffer: [u64; 4096],
-
-    ofront: usize,
-    orear: usize,
-    obuffer: [u64; 4096],
-}
-
-impl IOPortBuffer {
-    pub fn core_push(&mut self, data: u64) {
-        self.obuffer[self.orear] = data;
-        self.orear += 1;
-        if self.orear == 4096 {
-            self.orear = 0;
-        }
-    }
-
-    pub fn device_push(&mut self, data: u64) {
-        self.ibuffer[self.irear] = data;
-        self.irear += 1;
-        if self.irear == 4096 {
-            self.irear = 0;
-        }
-    }
-
-    pub fn core_get(&mut self) -> Result<u64, ()> {
-        if self.ifront == self.irear {
-            return Err(());
-        }
-        let x = self.ibuffer[self.ifront];
-        self.ifront += 1;
-        if self.ifront == 4096 {
-            self.ifront = 0;
-        }
-        Ok(x)
-    }
-
-    pub fn device_get(&mut self) -> Result<u64, ()> {
-        if self.ofront == self.orear {
-            return Err(());
-        }
-        let x = self.obuffer[self.ofront];
-        self.ofront += 1;
-        if self.ofront == 4096 {
-            self.ofront = 0;
-        }
-        Ok(x)
-    }
-}
-
-/// ## 核心IO控制器
-pub struct IOController {
-    /// ## 请求端口
-    ///
-    /// (port: u16, lock: bool)
-    /// port初始值为0， lock初始值为false；
-    /// 请求时将锁锁住，等待thr_pushreq为请求分配端口，写入port中；
-    /// 然后将锁解锁，连接到指定port。
-    ///
-    /// 由于无法为(u16, bool)实现Send trait，使用u32代替
-    pub reqport: SharedPointer<u32>,
-
-    /// ## 端口
-    ///
-    /// 端口号对应的端口结构存在这里。
-    pub ports: HashMap<u16, SharedPointer<IOPortBuffer>>,
-
-    /// ## 端口请求分配器
-    ///
-    /// 通过这个Sender把分配的端口发送给某个核心，
-    /// vec中每个Sender对应一个核心的Reciever。
-    pub port_deliver: Vec<Sender<u16>>,
-}
-
-unsafe impl Send for IOController {}
-unsafe impl Sync for IOController {}
-
-impl IOController {
-    pub fn new(delivers: Vec<Sender<u16>>) -> Self {
-        Self {
-            reqport: SharedPointer::<u32>::new(String::from("VcoreIORequestPort"), 1).unwrap(),
-            ports: HashMap::new(),
-            port_deliver: delivers,
-        }
-    }
-
-    pub fn thr_dispatch_ioreq(&mut self) {
-        self.reqport.write(0, 0);
-        let mut port_id = 256u16;
-        loop {
-            for sender in self.port_deliver.iter_mut() {
-                while !((self.reqport.at(0) >> 16) != 0) {}
-                *self.reqport.at_mut(0) = (port_id as u32) + (*self.reqport.at(0) & 0xffff0000);
-                while (self.reqport.at(0) >> 16) != 0 {}
-                *self.reqport.at_mut(0) = 0 + (*self.reqport.at(0) & 0xffff0000);
-                sender.send(port_id).unwrap();
-                self.ports.insert(
-                    port_id,
-                    SharedPointer::new(format!("VcoreIOPort{}", port_id), 1).unwrap(),
-                );
-                port_id += 1;
-            }
-        }
-    }
-
-    pub fn do_solid_ports_services(
-        ports: &mut Vec<Vec<SharedPointer<IOPortBuffer>>>,
-        mut startflgs: Vec<SharedPointer<(bool, u64)>>,
-    ) {
-        for core in ports {
-            // port 0: 设备连接端口
-            // 不在这里实现
-            // port 1: 多核唤醒
-            if let Ok(data) = core[1].at_mut(0).device_get() {
-                let (core, ip) = {
-                    let d1 = data & 0xffff_ffff;
-                    let data = data >> 32;
-                    (d1, data)
-                };
-                startflgs[core as usize].write(0, (true, ip));
-            }
         }
     }
 }
@@ -598,7 +275,7 @@ impl Vcore {
     /// 若权限不符，产生中断
     pub fn privilege_test(&mut self) -> bool {
         if self.regs.flag.bit_get(FlagRegFlag::Privilege) {
-            self.intctler.interrupt(InterruptId::InvalidInstruction);
+            self.intctler.interrupt(InterruptId::WrongPrivilege);
             false
         } else {
             true
@@ -721,7 +398,7 @@ impl Vcore {
                         return (Vec::new(), true);
                     }
                     AddressError::Unwritable => {
-                        panic!("出现了意外情况，在读寻址时返回了不可写错误")
+                        panic!("出现了意外情况，在读寻址时发生了不可写错误")
                     }
                     AddressError::Ineffective => {
                         self.intctler.interrupt(InterruptId::InaccessibleAddress);

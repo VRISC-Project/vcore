@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, BinaryHeap};
 
 use crate::{
     utils::shared::SharedPointer,
-    vrisc::vcore::{BitOptions, FlagRegFlag},
+    vrisc::vcore::{regs_flags::FlagRegFlag, BitOptions},
 };
 
 #[derive(Debug)]

@@ -32,7 +32,11 @@ use config::Config;
 #[cfg(feature = "debugger")]
 use debugger::debug::{Debugger, VdbApi};
 use utils::{clock::Clock, memory::Memory, shared::SharedPointer};
-use vrisc::vcore::{IOController, IOPortBuffer, InterruptId, Vcore};
+use vrisc::vcore::{
+    intcontroller::InterruptId,
+    iocontroller::{IOController, IOPortBuffer, PortRequest},
+    Vcore,
+};
 
 /// # vcore从这里开始运行
 ///
@@ -155,7 +159,7 @@ pub fn run(config: Config) {
 
     let ref_io_controller = Arc::clone(&io_controller);
     thread::spawn(move || {
-        ref_io_controller.write().unwrap().thr_dispatch_ioreq();
+        ({ ref_io_controller.write().unwrap() }).thr_dispatch_ioreq();
     });
 
     thread::spawn(move || {
@@ -192,7 +196,7 @@ fn vcore(
     total_core: usize,
     debug: bool,
     external_clock: bool,
-    ioreq_receiver: Receiver<u16>,
+    ioreq_receiver: Receiver<PortRequest>,
 ) {
     let mut core_startflg =
         SharedPointer::<(bool, u64)>::bind(format!("VcoreCore{}StartFlg", id), 1).unwrap();
@@ -233,9 +237,13 @@ fn vcore(
 
     loop {
         match ioreq_receiver.try_recv() {
-            Ok(port) => {
-                core.link_device(port);
-            }
+            Ok(port) => match port {
+                PortRequest::Link(port) => core.link_device(port),
+                PortRequest::Interrupt(port) => {
+                    core.intctler.interrupt(InterruptId::DeviceCommunication);
+                    core.regs.imsg = port as u64;
+                }
+            },
             _ => (),
         }
 

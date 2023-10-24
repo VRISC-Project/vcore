@@ -1,10 +1,11 @@
 use std::io::{Stdout, Write};
 use std::{thread, time::Duration};
 
-use crate::vrisc::vcore::{InterruptController, InterruptId};
+use crate::vrisc::vcore::intcontroller::{InterruptController, InterruptId};
+use crate::vrisc::vcore::regs_flags::Registers;
 use crate::{
     utils::{memory::Memory, shared::SharedPointer},
-    vrisc::vcore::{DebugMode, Registers},
+    vrisc::vcore::DebugMode,
 };
 
 use crossterm::execute;
