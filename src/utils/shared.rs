@@ -1,9 +1,4 @@
 use core::slice;
-#[cfg(target_os = "windows")]
-use std::mem::size_of;
-#[cfg(target_os = "linux")]
-use std::{mem::size_of, num::NonZeroUsize};
-
 #[cfg(target_os = "linux")]
 use nix::{
     errno::Errno,
@@ -15,6 +10,11 @@ use nix::{
     },
     unistd,
 };
+use std::ffi::c_void;
+#[cfg(target_os = "windows")]
+use std::mem::size_of;
+#[cfg(target_os = "linux")]
+use std::{mem::size_of, num::NonZeroUsize};
 
 #[cfg(target_os = "windows")]
 use winapi::um::handleapi::INVALID_HANDLE_VALUE;
@@ -40,14 +40,12 @@ pub enum AssignError {
     IndexOutOfSize,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 /// ## 共享内存的指针
 ///
 /// 将linux、winows、mac三个平台上的共享内存功能封装。
 ///
 /// > 并不是智能指针
-///
-/// * 目前需确保在一个进程只调用过一次new和bind函数。
 pub struct SharedPointer<T> {
     pub pointer: *mut T,
     size: usize,
@@ -190,9 +188,7 @@ impl<T> SharedPointer<T> {
 impl<T> Drop for SharedPointer<T> {
     #[cfg(target_os = "linux")]
     fn drop(&mut self) {
-        unsafe {
-            sys::mman::munmap(self.pointer.cast(), self.size).unwrap();
-        }
+        unsafe { sys::mman::munmap(self.pointer as *mut c_void, self.size).unwrap() };
         unistd::close(self.fd).unwrap();
         self.pointer = 0 as *mut T;
     }
@@ -206,6 +202,12 @@ impl<T> Drop for SharedPointer<T> {
             CloseHandle(self.hdl);
         }
         self.pointer = 0 as *mut T;
+    }
+}
+
+impl<T> Clone for SharedPointer<T> {
+    fn clone(&self) -> Self {
+        SharedPointer::<T>::bind(self.name.clone(), self.size()).unwrap()
     }
 }
 
