@@ -18,7 +18,7 @@ use crate::utils::{
 use self::{
     addresser::LazyAddress,
     intcontroller::{InterruptController, InterruptId},
-    iocontroller::{IOPortBuffer, PortRequest},
+    iocontroller::IOPortBuffer,
     regs_flags::{ConditionCode, FlagRegFlag, Registers},
 };
 

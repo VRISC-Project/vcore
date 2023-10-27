@@ -40,6 +40,7 @@ cargo run --bin vcore --release -- -h
   越过最小页框，页框边界两边的两段内存分别读取。
 * `initext`和`destext`指令暂时无效。
 * 在开启vcore debugger的版本中，在step模式下，执行nop指令时查看寄存器，`ip`寄存器会指向下一个指令。
+* DMA功能直接通过获取DMAObject，绑定vcore内存访问，内存安全靠虚拟设备进程保证。
 
 ## 支持操作系统平台
 

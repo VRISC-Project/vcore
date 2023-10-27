@@ -1,6 +1,11 @@
-use std::{collections::HashMap, sync::mpsc::Sender};
+use std::{
+    collections::HashMap,
+    sync::{mpsc::Sender, Arc, RwLock},
+};
 
 use crate::utils::shared::SharedPointer;
+
+use super::dma::{DMAStatus, DirectMemoryAccess};
 
 /// ## 核心IO控制器
 pub struct IOController {
@@ -56,7 +61,7 @@ impl IOController {
         loop {
             for sender in self.port_deliver.iter_mut() {
                 if let Some(port) = self.intport.at_mut(0).core_get() {
-                    sender.send(PortRequest::Interrupt(port as u16));
+                    sender.send(PortRequest::Interrupt(port as u16)).unwrap();
                 }
                 if !((self.reqport.at(0) >> 16) != 0) {
                     continue;
@@ -69,7 +74,11 @@ impl IOController {
                     port_id,
                     SharedPointer::new(format!("VcoreIOPort{}", port_id), 1).unwrap(),
                 );
-                port_id += 1;
+                if port_id == u16::MAX {
+                    port_id = 256;
+                } else {
+                    port_id += 1;
+                }
             }
         }
     }
@@ -77,7 +86,10 @@ impl IOController {
     pub fn do_solid_ports_services(
         ports: &mut Vec<Vec<SharedPointer<IOPortBuffer>>>,
         mut startflgs: Vec<SharedPointer<(bool, u64)>>,
+        dma_controller: Arc<RwLock<DirectMemoryAccess>>,
     ) {
+        let mut dma_current = 0;
+        let mut dma_opstatus = DMAStatus::None;
         for core in ports {
             // port 0: 设备连接端口
             // 不在这里实现
@@ -89,6 +101,52 @@ impl IOController {
                     (d1, data)
                 };
                 startflgs[core as usize].write(0, (true, ip));
+            }
+            // port 2: dma管理
+            if let Some(data) = core[2].at_mut(0).device_get() {
+                match data {
+                    0 => {
+                        dma_current = dma_controller.write().unwrap().create_new();
+                        core[2].at_mut(0).device_push(dma_current);
+                    }
+                    1 => {
+                        dma_opstatus = DMAStatus::SetCurrentDMAId;
+                    }
+                    2 => {
+                        dma_opstatus = DMAStatus::SetDMAStart;
+                    }
+                    3 => {
+                        dma_opstatus = DMAStatus::SetDMALength;
+                    }
+                    4 => {
+                        dma_opstatus = DMAStatus::SetDMARead;
+                    }
+                    5 => {
+                        dma_opstatus = DMAStatus::SetDMAWrite;
+                    }
+                    6 => {
+                        dma_controller.write().unwrap().remove(dma_current);
+                    }
+                    data => match dma_opstatus {
+                        DMAStatus::SetCurrentDMAId => {
+                            dma_current = data;
+                        }
+                        DMAStatus::SetDMAStart => {
+                            dma_controller.write().unwrap().set_start(dma_current, data);
+                        }
+                        DMAStatus::SetDMALength => dma_controller
+                            .write()
+                            .unwrap()
+                            .set_length(dma_current, data),
+                        DMAStatus::SetDMARead => {
+                            dma_controller.write().unwrap().set_read(dma_current, data);
+                        }
+                        DMAStatus::SetDMAWrite => {
+                            dma_controller.write().unwrap().set_write(dma_current, data);
+                        }
+                        _ => (),
+                    },
+                }
             }
         }
     }

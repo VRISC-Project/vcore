@@ -33,6 +33,7 @@ use config::Config;
 use debugger::debug::{Debugger, VdbApi};
 use utils::{clock::Clock, memory::Memory, shared::SharedPointer};
 use vrisc::vcore::{
+    dma::DirectMemoryAccess,
     intcontroller::InterruptId,
     iocontroller::{IOController, IOPortBuffer, PortRequest},
     Vcore,
@@ -100,6 +101,10 @@ pub fn run(config: Config) {
     };
     let solid_io_ports = Arc::new(RwLock::new(solid_io_ports));
 
+    // 初始化dma
+    let dma_controller = DirectMemoryAccess::new();
+    let dma_controller = Arc::new(RwLock::new(dma_controller));
+
     #[cfg(feature = "debugger")]
     let mut cores_debug_port = Vec::new();
 
@@ -137,7 +142,7 @@ pub fn run(config: Config) {
             cores_startflg[i].write(0, (false, 0));
         }
         #[cfg(target_os = "linux")]
-        match (unsafe { unistd::fork().unwrap() }) {
+        match { unsafe { unistd::fork().unwrap() } } {
             unistd::ForkResult::Parent { child } => cores.push(child),
             unistd::ForkResult::Child => {
                 vcore(
@@ -166,6 +171,7 @@ pub fn run(config: Config) {
         IOController::do_solid_ports_services(
             solid_io_ports.write().unwrap().as_mut(),
             cores_startflg,
+            dma_controller,
         );
     });
 
