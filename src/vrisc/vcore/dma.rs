@@ -15,8 +15,13 @@ impl DirectMemoryAccess {
         }
     }
 
-    pub fn device_bind(id: u64) -> Option<SharedPointer<DMAObject>> {
-        Some(SharedPointer::<DMAObject>::bind(format!("VcoreDMA{}Obj", id), 1).unwrap())
+    pub fn device_bind(id: u64) -> Option<(SharedPointer<DMAObject>, SharedPointer<u8>)> {
+        let dmaobj = SharedPointer::<DMAObject>::bind(format!("VcoreDMA{}Obj", id), 1).unwrap();
+        let size = dmaobj.at(0).start + dmaobj.at(0).length;
+        Some((
+            dmaobj,
+            SharedPointer::<u8>::bind(String::from("VcoreVriscMainMemory"), size as usize).unwrap(),
+        ))
     }
 
     pub fn create_new(&mut self) -> u64 {
