@@ -141,13 +141,16 @@ fn view(cmd: &mut Vec<String>, stdout: &mut Stdout, memory: &mut Memory) {
     for i in 0..(data.len() / 16) {
         let i = i * 16;
         // 打印地址
+        execute!(stdout, SetForegroundColor(Color::DarkGreen)).unwrap();
         write!(
             stdout,
-            "{:08x} {:08x} |",
+            "{:08x} {:08x}",
             (start as usize + i) >> 32,
             (start as usize + i),
         )
         .unwrap();
+        execute!(stdout, ResetColor).unwrap();
+        write!(stdout, " |").unwrap();
         // 打印数据的16进制形式
         execute!(stdout, SetForegroundColor(Color::DarkGrey)).unwrap();
         for j in 0..16usize {
