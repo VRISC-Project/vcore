@@ -236,7 +236,7 @@ fn vcore(
     }
 
     // 内部时钟 (250Hz)
-    let mut clock = Clock::new(4);
+    let mut clock = Clock::new(Duration::from_millis(4));
 
     core.regs.ip = core_startflg.1;
 
