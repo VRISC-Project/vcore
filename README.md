@@ -22,7 +22,7 @@ cargo run --bin vcore --release -- -h
 
 ## 多处理器
 
-支持多核，开启时默认启动core#0。
+支持多核，默认启动core#0并由此核心引导其它核心启动。
 
 ## 开发计划
 
@@ -46,9 +46,8 @@ cargo run --bin vcore --release -- -h
 
 平台|状态
 :-:|:-
-Linux|0.2.3正在开发
+Linux|0.2.4正在开发
 Windows|正在开发
-Mac|等待适配
 
 ## 版本迭代
 
