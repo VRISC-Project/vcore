@@ -4,7 +4,10 @@ use std::{thread, time::Duration};
 use crate::vrisc::vcore::intcontroller::{InterruptController, InterruptId};
 use crate::vrisc::vcore::regs_flags::Registers;
 use crate::{
-    utils::{memory::Memory, shared::SharedPointer},
+    utils::{
+        memory::Memory,
+        shared::{Addressable, SharedPointer},
+    },
     vrisc::vcore::DebugMode,
 };
 
@@ -211,7 +214,7 @@ impl DebuggerBackend {
         core_startflg: &mut SharedPointer<(bool, u64)>,
         debug_mode: &mut DebugMode,
     ) -> Option<bool> {
-        match *self.core_debug_port.at(0) {
+        match **self.core_debug_port {
             VdbApi::Initialized => Some(true),
             VdbApi::StartCore => {
                 core_startflg.write(0, (true, 0));
@@ -249,7 +252,7 @@ impl DebuggerBackend {
         debug_mode: &mut DebugMode,
         memory: &mut Memory,
     ) -> Option<bool> {
-        match *self.core_debug_port.at(0) {
+        match **self.core_debug_port {
             VdbApi::Exit => {
                 return None;
             }
@@ -316,7 +319,7 @@ impl DebuggerBackend {
             _ => (),
         }
         if *debug_mode == DebugMode::Step {
-            if let VdbApi::Continue = *self.core_debug_port.at(0) {
+            if let VdbApi::Continue = **self.core_debug_port {
                 self.core_debug_port.write(0, VdbApi::Ok);
                 Some(false)
             } else {

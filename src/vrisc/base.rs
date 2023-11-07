@@ -1,4 +1,4 @@
-use crate::utils::memory::ReadWrite;
+use crate::utils::{memory::ReadWrite, shared::Addressable};
 
 use super::vcore::{
     intcontroller::InterruptId,
@@ -847,7 +847,7 @@ pub fn i_in(inst: &[u8], core: &mut Vcore) -> u64 {
         core.regs.x[src as usize] as u16
     };
     core.regs.x[tar as usize] = if let Some(port) = core.io_ports.get_mut(&src) {
-        if let Some(x) = port.at_mut(0).core_get() {
+        if let Some(x) = port.core_get() {
             x
         } else {
             0
@@ -871,7 +871,7 @@ pub fn i_out(inst: &[u8], core: &mut Vcore) -> u64 {
         core.regs.x[src as usize] as u16
     };
     if let Some(port) = core.io_ports.get_mut(&tar) {
-        port.at_mut(0).core_push(core.regs.x[src as usize]);
+        port.core_push(core.regs.x[src as usize]);
     }
     4
 }

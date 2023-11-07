@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, BinaryHeap};
 
 use crate::{
-    utils::shared::SharedPointer,
+    utils::shared::{Addressable, SharedPointer},
     vrisc::vcore::{regs_flags::FlagRegFlag, BitOptions},
 };
 

@@ -7,5 +7,5 @@ fn main() {
         "vcore
 (c)Copyright Random World Studio 2023. All rights served."
     );
-    vcore::run(config);
+    vcore::vcore::run(config);
 }

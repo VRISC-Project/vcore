@@ -10,9 +10,12 @@ use nix::{
     },
     unistd,
 };
-use std::ffi::c_void;
 #[cfg(target_os = "windows")]
 use std::mem::size_of;
+use std::{
+    ffi::c_void,
+    ops::{Deref, DerefMut},
+};
 #[cfg(target_os = "linux")]
 use std::{mem::size_of, num::NonZeroUsize};
 
@@ -211,9 +214,20 @@ impl<T> Clone for SharedPointer<T> {
     }
 }
 
-impl<T> SharedPointer<T> {
+pub trait Addressable<T>: DerefMut {
+    fn slice<'a>(&self, addr: u64, len: u64) -> &'a [T];
+    fn slice_mut<'a>(&mut self, addr: u64, len: u64) -> &'a mut [T];
+
+    fn at<'a>(&self, addr: u64) -> &'a T;
+    fn at_mut<'a>(&mut self, addr: u64) -> &'a mut T;
+
+    fn write(&mut self, addr: u64, t: T);
+    fn write_slice(&mut self, addr: u64, s: &[T]);
+}
+
+impl<T> Addressable<T> for SharedPointer<T> {
     #[inline]
-    pub fn slice<'a>(&self, addr: u64, mut len: u64) -> &'a [T] {
+    fn slice<'a>(&self, addr: u64, mut len: u64) -> &'a [T] {
         if ((addr + len) as usize) > self.size {
             len = (self.size as u64) - addr;
         }
@@ -221,7 +235,7 @@ impl<T> SharedPointer<T> {
     }
 
     #[inline]
-    pub fn slice_mut<'a>(&self, addr: u64, mut len: u64) -> &'a mut [T] {
+    fn slice_mut<'a>(&mut self, addr: u64, mut len: u64) -> &'a mut [T] {
         if ((addr + len) as usize) > self.size {
             len = (self.size as u64) - addr;
         }
@@ -229,17 +243,17 @@ impl<T> SharedPointer<T> {
     }
 
     #[inline]
-    pub fn at<'a>(&self, addr: u64) -> &'a T {
+    fn at<'a>(&self, addr: u64) -> &'a T {
         unsafe { &*self.pointer.add(addr as usize) }
     }
 
     #[inline]
-    pub fn at_mut<'a>(&mut self, addr: u64) -> &'a mut T {
+    fn at_mut<'a>(&mut self, addr: u64) -> &'a mut T {
         unsafe { &mut *self.pointer.add(addr as usize) }
     }
 
     #[inline]
-    pub fn write(&mut self, addr: u64, t: T) {
+    fn write(&mut self, addr: u64, t: T) {
         if (addr as usize) < self.size {
             unsafe {
                 *self.pointer.add(addr as usize) = t;
@@ -248,7 +262,7 @@ impl<T> SharedPointer<T> {
     }
 
     #[inline]
-    pub fn write_slice(&mut self, addr: u64, s: &[T]) {
+    fn write_slice(&mut self, addr: u64, s: &[T]) {
         if (addr as usize) + s.len() < self.size {
             unsafe {
                 self.pointer
@@ -256,6 +270,19 @@ impl<T> SharedPointer<T> {
                     .copy_from(s.as_ptr(), s.len())
             }
         }
+    }
+}
+
+impl<T> Deref for SharedPointer<T> {
+    type Target = T;
+    fn deref(&self) -> &Self::Target {
+        self.at(0)
+    }
+}
+
+impl<T> DerefMut for SharedPointer<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.at_mut(0)
     }
 }
 

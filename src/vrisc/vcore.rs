@@ -12,7 +12,7 @@ use std::{
 
 use crate::utils::{
     memory::{AddressError, Memory, ReadWrite},
-    shared::SharedPointer,
+    shared::{Addressable, SharedPointer},
 };
 
 use self::{
@@ -201,11 +201,7 @@ impl Vcore {
     pub fn link_device(&mut self, port: u16) {
         self.add_port(port, false, self.id());
         self.intctler.interrupt(InterruptId::Device);
-        self.io_ports
-            .get_mut(&0)
-            .unwrap()
-            .at_mut(0)
-            .device_push(port as u64);
+        self.io_ports.get_mut(&0).unwrap().device_push(port as u64);
     }
 
     #[inline]
@@ -407,7 +403,7 @@ impl Vcore {
                     }
                 },
             };
-            inst.append(&mut self.memory().borrow().slice_mut(last_st, lastl).to_vec());
+            inst.append(&mut self.memory.borrow_mut().slice_mut(last_st, lastl).to_vec());
             self.lazyaddr.crossed_page = true;
             (inst, false)
         }

@@ -98,7 +98,7 @@ impl Terminal {
 
     fn do_shutdown(&self, debug_ports: &mut Vec<SharedPointer<VdbApi>>) {
         for i in 0..debug_ports.len() {
-            debug_ports[i].at_mut(0).get_result(VdbApi::Exit);
+            debug_ports[i].get_result(VdbApi::Exit);
         }
     }
 

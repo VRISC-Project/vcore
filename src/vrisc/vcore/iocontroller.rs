@@ -3,9 +3,9 @@ use std::{
     sync::{mpsc::Sender, Arc, RwLock},
 };
 
-use crate::utils::shared::SharedPointer;
+use crate::utils::shared::{Addressable, SharedPointer};
 
-use super::dma::{DMAStatus, DirectMemoryAccess};
+use super::dma::{DMADevice, DMAStatus, DirectMemoryAccess};
 
 /// ## 核心IO控制器
 pub struct IOController {
@@ -60,15 +60,17 @@ impl IOController {
         let mut port_id = 256u16;
         loop {
             for sender in self.port_deliver.iter_mut() {
-                if let Some(port) = self.intport.at_mut(0).core_get() {
+                if let Some(port) = self.intport.core_get() {
                     sender.send(PortRequest::Interrupt(port as u16)).unwrap();
                 }
-                if !((self.reqport.at(0) >> 16) != 0) {
+                if (*self.reqport >> 16) == 0 {
                     continue;
                 }
-                *self.reqport.at_mut(0) = (port_id as u32) + (*self.reqport.at(0) & 0xffff0000);
-                while (self.reqport.at(0) >> 16) != 0 {}
-                *self.reqport.at_mut(0) = 0 + (*self.reqport.at(0) & 0xffff0000);
+                *self.reqport = (port_id as u32) + (*self.reqport & 0xffff0000);
+                while (*self.reqport >> 16) != 0 {
+                    assert!(true); // 使while循环反复求值而不是死循环
+                }
+                *self.reqport = 0 + (*self.reqport & 0xffff0000);
                 sender.send(PortRequest::Link(port_id)).unwrap();
                 self.ports.insert(
                     port_id,
@@ -94,7 +96,7 @@ impl IOController {
             // port 0: 设备连接端口
             // 不在这里实现
             // port 1: 多核唤醒
-            if let Some(data) = core[1].at_mut(0).device_get() {
+            if let Some(data) = core[1].device_get() {
                 let (core, ip) = {
                     let d1 = data & 0xffff_ffff;
                     let data = data >> 32;
@@ -103,11 +105,11 @@ impl IOController {
                 startflgs[core as usize].write(0, (true, ip));
             }
             // port 2: dma管理
-            if let Some(data) = core[2].at_mut(0).device_get() {
+            if let Some(data) = core[2].device_get() {
                 match data {
                     0 => {
                         dma_current = dma_controller.write().unwrap().create_new();
-                        core[2].at_mut(0).device_push(dma_current);
+                        core[2].device_push(dma_current);
                     }
                     1 => {
                         dma_opstatus = DMAStatus::SetCurrentDMAId;
@@ -149,6 +151,102 @@ impl IOController {
                 }
             }
         }
+    }
+}
+
+pub struct IODevice {
+    port_id: u16,
+    io_port: SharedPointer<IOPortBuffer>,
+    int_port: SharedPointer<IOPortBuffer>,
+}
+
+impl IODevice {
+    pub fn new() -> Self {
+        let mut reqport =
+            SharedPointer::<u32>::bind(String::from("VcoreIORequestPort"), 1).unwrap();
+        reqport.write(0, 1 << 16);
+        while *reqport & 0xffff == 0 {
+            assert!(true);
+        }
+        let port_id = (*reqport & 0xffff) as u16;
+        reqport.write(0, 0);
+        let io_port =
+            SharedPointer::<IOPortBuffer>::bind(format!("VcoreIOPort{}", port_id), 1).unwrap();
+        Self {
+            port_id,
+            io_port,
+            int_port: SharedPointer::<IOPortBuffer>::bind(String::from("VcoreInterruptPort"), 1)
+                .unwrap(),
+        }
+    }
+}
+
+pub struct CharacterDevice {
+    dev: IODevice,
+}
+
+impl CharacterDevice {
+    pub fn new() -> Self {
+        Self {
+            dev: IODevice::new(),
+        }
+    }
+
+    pub fn input(&mut self, content: &[u8]) {
+        let mut count = 0;
+        let mut data = 0u64;
+        for byte in content {
+            data |= (*byte as u64) << (count * 8);
+            count += 1;
+            if count == 8 {
+                count = 0;
+                self.dev.io_port.device_push(data);
+            }
+        }
+        if count != 0 {
+            self.dev.io_port.device_push(data);
+        }
+        self.dev.int_port.device_push(self.dev.port_id as u64);
+    }
+
+    pub fn output(&mut self) -> Option<Vec<u8>> {
+        let mut v = Vec::new();
+        while let Some(qw) = self.dev.io_port.device_get() {
+            for i in 0..8 {
+                v.push((qw >> (i * 8)) as u8);
+            }
+        }
+        if v.is_empty() {
+            None
+        } else {
+            Some(v)
+        }
+    }
+}
+
+pub struct BlockDevice {
+    dev: CharacterDevice,
+    dma: Option<DMADevice>,
+}
+
+impl BlockDevice {
+    pub fn new() -> Self {
+        Self {
+            dev: CharacterDevice::new(),
+            dma: None,
+        }
+    }
+
+    pub fn get_dev_mut(&mut self) -> &mut CharacterDevice {
+        &mut self.dev
+    }
+
+    pub fn get_dma(&self) -> &Option<DMADevice> {
+        &self.dma
+    }
+
+    pub fn get_dma_mut(&mut self) -> &mut Option<DMADevice> {
+        &mut self.dma
     }
 }
 

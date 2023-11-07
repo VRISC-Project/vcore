@@ -5,7 +5,10 @@ use crossterm::{
     style::{Attribute, Color, Print, ResetColor, SetAttribute, SetForegroundColor},
 };
 
-use crate::utils::{memory::Memory, rdxparse::RadixParse};
+use crate::utils::{
+    rdxparse::RadixParse,
+    {memory::Memory, shared::Addressable},
+};
 
 use super::terminal::Terminal;
 

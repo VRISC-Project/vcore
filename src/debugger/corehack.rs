@@ -6,7 +6,11 @@ use crossterm::{
 };
 
 use crate::{
-    utils::{memory::Memory, rdxparse::RadixParse, shared::SharedPointer},
+    utils::{
+        memory::Memory,
+        rdxparse::RadixParse,
+        shared::{Addressable, SharedPointer},
+    },
     vrisc::vcore::DebugMode,
 };
 
@@ -185,9 +189,7 @@ fn interrupt(
         return;
     }
     let intid: u8 = cmd[0].rdxparse().unwrap();
-    let result = debug_ports[debugging_core.unwrap()]
-        .at_mut(0)
-        .get_result(VdbApi::Interrupt(intid));
+    let result = debug_ports[debugging_core.unwrap()].get_result(VdbApi::Interrupt(intid));
     if let VdbApi::NotRunning = result {
         core_not_runnig(stdout, debugging_core);
         return;
@@ -208,9 +210,7 @@ fn instruction(
         core_not_entered(stdout);
         return;
     }
-    let result = debug_ports[debugging_core.unwrap()]
-        .at_mut(0)
-        .get_result(VdbApi::Register(None));
+    let result = debug_ports[debugging_core.unwrap()].get_result(VdbApi::Register(None));
     let regs = if let VdbApi::Register(Some(regs)) = result {
         regs.clone()
     } else if let VdbApi::NotRunning = result {
@@ -281,9 +281,7 @@ fn register_write(
         arg_nan(stdout, &cmd[1]);
         return;
     };
-    let result = debug_ports[debugging_core.unwrap()]
-        .at_mut(0)
-        .get_result(VdbApi::WriteRegister(reg, data));
+    let result = debug_ports[debugging_core.unwrap()].get_result(VdbApi::WriteRegister(reg, data));
     if let VdbApi::Ok = result {
     } else if let VdbApi::NotRunning = result {
         core_not_runnig(stdout, debugging_core);
@@ -303,9 +301,7 @@ fn register_get(
         core_not_entered(stdout);
         return;
     }
-    let result = debug_ports[debugging_core.unwrap()]
-        .at_mut(0)
-        .get_result(VdbApi::Register(None));
+    let result = debug_ports[debugging_core.unwrap()].get_result(VdbApi::Register(None));
     let regs = if let VdbApi::Register(Some(regs)) = result {
         regs.clone()
     } else if let VdbApi::NotRunning = result {
@@ -351,9 +347,7 @@ fn start(
         core_not_entered(stdout);
         return;
     }
-    let result = debug_ports[debugging_core.unwrap()]
-        .at_mut(0)
-        .get_result(VdbApi::StartCore);
+    let result = debug_ports[debugging_core.unwrap()].get_result(VdbApi::StartCore);
     if let VdbApi::CoreStarted = result {
         write!(stdout, "核心{}已启动\n", debugging_core.unwrap()).unwrap();
     } else if let VdbApi::Ok = result {
@@ -389,10 +383,7 @@ fn mode(
             return;
         }
     };
-    if let VdbApi::Ok = debug_ports[debugging_core.unwrap()]
-        .at_mut(0)
-        .get_result(VdbApi::DebugMode(mode))
-    {
+    if let VdbApi::Ok = debug_ports[debugging_core.unwrap()].get_result(VdbApi::DebugMode(mode)) {
     } else {
         core_noresult(stdout, debugging_core);
     }
@@ -407,9 +398,7 @@ fn continue_instruction(
         core_not_entered(stdout);
         return;
     }
-    let result = debug_ports[debugging_core.unwrap()]
-        .at_mut(0)
-        .get_result(VdbApi::Continue);
+    let result = debug_ports[debugging_core.unwrap()].get_result(VdbApi::Continue);
     if let VdbApi::NotRunning = result {
         core_not_runnig(stdout, debugging_core);
     } else if let VdbApi::Ok = result {
